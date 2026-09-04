@@ -916,10 +916,10 @@ function treeHTML(){
             ]},
             {id:'nl_vden',name:'Denied by Vendor',sub2:'rejected by vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber'}
           ]},
-          {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber'}
+          {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber',weight:0.7}
         ]},
         {id:'notfeas',name:'Not Feasible',count:K.notFeasEval,sub:pct(K.notFeasEval,K.evaluated)+' of eval',type:'notfeasible',children:[
-          {id:'space',name:'Space Blocked',count:K.nfSpace,type:'leaf-space',action:'→ Re-site',actionCls:'act-red'},
+          {id:'space',name:'Space Blocked',count:K.nfSpace,type:'leaf-space',action:'→ Re-site',actionCls:'act-red',weight:0.8},
           {id:'power',name:'Power Blocked',count:K.nfPower,type:'leaf-power',action:'→ split on vendor',children:[
             {id:'power_v',name:'+ Vendor Interest',count:K.nfPowerV,type:'leaf-roi',action:'→ ROI calc',actionCls:'act-purple'},
             {id:'power_nv',name:'No Vendor',count:K.nfPowerNV,type:'leaf-grey',action:'→ Source vendor',actionCls:'act-grey'}
@@ -927,21 +927,23 @@ function treeHTML(){
           {id:'both',name:'Both Blocked',count:K.nfBoth,type:'leaf-both',action:'→ Deprioritize',actionCls:'act-red'}
         ]}
       ]},
-      {id:'under_eval',name:'Under Evaluation',sub2:'explicit callout',count:K.underEval,sub:pct(K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Await RE check',actionCls:'act-blue'},
-      {id:'not_eval',name:'Not Evaluated',count:K.total-K.evaluated-K.underEval,sub:pct(K.total-K.evaluated-K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Complete assessment',actionCls:'act-blue'}
+      {id:'under_eval',name:'Under Evaluation',sub2:'explicit callout',count:K.underEval,sub:pct(K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Await RE check',actionCls:'act-blue',weight:0.5},
+      {id:'not_eval',name:'Not Evaluated',count:K.total-K.evaluated-K.underEval,sub:pct(K.total-K.evaluated-K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Complete assessment',actionCls:'act-blue',weight:0.5}
     ]
   };
-  let leafCounter=0,maxLevel=0,numLeaves=0;
+  let leafCounter=0,maxLevel=0,totalWeight=0;
+  function leafW(n){ return n.weight!=null?n.weight:1; }
   function layout(n,level){
     n.level=level;if(level>maxLevel)maxLevel=level;
-    if(!n.children||!n.children.length){n.xs=leafCounter++;numLeaves++;}
-    else{n.children.forEach(c=>layout(c,level+1));n.xs=(n.children[0].xs+n.children[n.children.length-1].xs)/2;}
+    if(!n.children||!n.children.length){n.xs=leafCounter;n.w=leafW(n);leafCounter+=n.w;totalWeight+=n.w;}
+    else{n.children.forEach(c=>layout(c,level+1));n.xs=(n.children[0].xs+n.children[n.children.length-1].xs+n.children[n.children.length-1].w)/2;n.w=n.children.reduce((s,c)=>s+c.w,0);}
   }
   layout(TREE,0);
-  const nodeW=138,nodeH=74,xGap=6,yGap=28,pad=16;
-  const xPix=s=>pad+s*(nodeW+xGap);
+  const nodeW=138,nodeH=74,yGap=28,pad=16;
+  const xUnit=nodeW+6;
+  const xPix=s=>pad+s*xUnit;
   const yPix=l=>pad+l*(nodeH+yGap);
-  const W=pad*2+numLeaves*(nodeW+xGap)-xGap;
+  const W=pad*2+totalWeight*xUnit-6;
   const H=pad*2+(maxLevel+1)*nodeH+maxLevel*yGap;
   let nodes='',conns='';
   function nodeHTML(n){
