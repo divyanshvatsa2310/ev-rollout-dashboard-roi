@@ -154,8 +154,8 @@ tbody tr:hover{background:#f8fafc}
 .snode .taction.act-blue{background:#dbeafe;color:#1e40af}
 .snode .taction.act-purple{background:#ede9fe;color:#5b21b6}
 .snode .taction.act-grey{background:#f1f5f9;color:#475569}
-/* Yulu priority badge inside tree nodes */
-.yulu-badge{display:inline-block;font-size:7px;font-weight:800;line-height:1;padding:1px 3px;border-radius:4px;margin-left:3px;vertical-align:middle}
+/* Yulu priority count badges inside tree nodes */
+.yulu-badge{display:inline-block;font-size:6px;font-weight:800;line-height:1;padding:1px 2px;border-radius:3px;margin:0 1px;vertical-align:middle;white-space:nowrap}
 .yulu-p0{background:#16a34a;color:#fff}
 .yulu-p1{background:#f59e0b;color:#fff}
 .yulu-p2{background:#ef4444;color:#fff}
@@ -164,8 +164,8 @@ tbody tr:hover{background:#f8fafc}
 .yulu-none{background:#f1f5f9;color:#94a3b8}
 #yuluToggle.on{background:#dcfce7;color:#166534;border-color:#16a34a}
 #yuluToggle.on #yuluDot{background:#16a34a}
-/* Yulu priority badge inside tree nodes */
-.yulu-badge{display:inline-block;font-size:7px;font-weight:800;line-height:1;padding:1px 3px;border-radius:4px;margin-left:3px;vertical-align:middle}
+/* Yulu priority count badges inside tree nodes */
+.yulu-badge{display:inline-block;font-size:6px;font-weight:800;line-height:1;padding:1px 2px;border-radius:3px;margin:0 1px;vertical-align:middle;white-space:nowrap}
 .yulu-p0{background:#16a34a;color:#fff}
 .yulu-p1{background:#f59e0b;color:#fff}
 .yulu-p2{background:#ef4444;color:#fff}
@@ -879,13 +879,18 @@ function yuluDominant(pods){
   if(c.P4) return "P4";
   return "none";
 }
-// Return a short Yulu badge HTML for a given dominant priority (empty if toggle off)
+// Return a compact Yulu count badge: P0:12 P1:3 P2:5 (empty if toggle off)
 function yuluBadge(pods){
   if(!YULU_ON) return "";
-  const d=yuluDominant(pods);
-  if(d==="none") return `<span class="yulu-badge yulu-none" title="No Yulu data">—</span>`;
-  const cls={P0:"yulu-p0",P1:"yulu-p1",P2:"yulu-p2",P3:"yulu-p3",P4:"yulu-p4"}[d];
-  return `<span class="yulu-badge ${cls}" title="Yulu priority (highest present in this branch)">${d}</span>`;
+  const c=yuluCountsForPods(pods);
+  const parts=[];
+  if(c.P0) parts.push(`<span class="yulu-badge yulu-p0">P0:${c.P0}</span>`);
+  if(c.P1) parts.push(`<span class="yulu-badge yulu-p1">P1:${c.P1}</span>`);
+  if(c.P2) parts.push(`<span class="yulu-badge yulu-p2">P2:${c.P2}</span>`);
+  if(c.P3) parts.push(`<span class="yulu-badge yulu-p3">P3:${c.P3}</span>`);
+  if(c.P4) parts.push(`<span class="yulu-badge yulu-p4">P4:${c.P4}</span>`);
+  if(!parts.length) return `<span class="yulu-badge yulu-none" title="No Yulu data for this branch">Yulu:—</span>`;
+  return parts.join(" ");
 }
 const TOP4=["Delhi","Gurgaon","Noida","Mumbai","Bangalore","Hyderabad"];      // NCR=Delhi+Gurgaon+Noida
 const TOP7=[...TOP4,"Kolkata","Pune","Chennai"];
@@ -1227,7 +1232,7 @@ function treeHTML(){
     <span><i style="border-color:var(--amber);background:#fffbeb"></i>NOC stage</span>
     <span><i style="border-color:var(--green);background:#f0fdf4"></i>Final rollout ✓</span>
     <span><i style="border-color:#9a3412;background:#fff7ed"></i>Leaf = action needed</span>
-    <span style="margin-left:8px"><b class="yulu-badge yulu-p0">P0</b> Yulu high &nbsp; <b class="yulu-badge yulu-p1">P1</b> medium &nbsp; <b class="yulu-badge yulu-p2">P2</b> low &nbsp; <b class="yulu-badge yulu-none">—</b> no data</span>
+    <span style="margin-left:8px"><b class="yulu-badge yulu-p0">P0</b> high &nbsp; <b class="yulu-badge yulu-p1">P1</b> medium &nbsp; <b class="yulu-badge yulu-p2">P2</b> low &nbsp; counts shown per branch</span>
   </div>`;
 }
 
