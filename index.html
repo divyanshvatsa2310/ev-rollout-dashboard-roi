@@ -344,7 +344,7 @@ tbody tr:hover{background:#f8fafc}
     </div>
     <div class="meta">
       <select id="asof" class="chip" title="View as on date" style="cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--navy);font-weight:600;font-size:12px;max-width:260px">
-        <option value="seed">Seed baseline — 2026-03-15</option>
+        <option value="seed">Seed baseline — 2025-09-04</option>
       </select>
       <span class="chip" id="batch">Batch —</span>
       <span class="chip" id="dirtyFlag" style="display:none;background:#fef3c7;color:#92400e;border-color:#f59e0b">● Unsaved changes</span>
@@ -385,7 +385,7 @@ tbody tr:hover{background:#f8fafc}
 <script>
 /* ============ DATA (from upload) ============ */
 const DATA = {
-  as_of: "2026-03-15",
+  as_of: "2025-09-04",
   total: 1227, live_universe: 1214, upcoming_universe: 13,
   assessed: 801, not_assessed: 426, evaluated: 346, under_eval: 187,
   feasible: 156, not_feas_eval: 190, space_only: 70, power_only: 37,
@@ -767,7 +767,7 @@ function refreshVersionDropdown(selected){
   const v=loadVersions();
   const cur=sel.value;
   // rebuild options: seed baseline + all saved versions (newest first)
-  sel.innerHTML='<option value="seed">Seed baseline — 2026-03-15</option>';
+  sel.innerHTML='<option value="seed">Seed baseline — 2025-09-04</option>';
   v.slice().reverse().forEach(ver=>{
     const o=document.createElement("option"); o.value=ver.id; o.textContent=ver.label; sel.appendChild(o);
   });
@@ -784,7 +784,7 @@ document.getElementById("saveBtn").addEventListener("click",function(){
   const sel=document.getElementById("asof").value;
   let blob;
   if(sel==="live" && window.__LIVE){ blob={raw:window.__LIVE.raw, as_of:window.__LIVE.as_of, batch:window.__LIVE.batch, rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
-  else if(sel==="seed"){ blob={raw:{universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice()}, as_of:DATA.as_of, batch:"Seed baseline", rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
+  else if(sel==="seed"){ blob={raw:{universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()}, as_of:DATA.as_of, batch:"Seed baseline", rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
   else {
     const v=loadVersions(); const found=v.find(x=>x.id===sel);
     if(!found){ alert("Nothing to save — upload a file first."); return; }
@@ -812,7 +812,7 @@ document.getElementById("asof").addEventListener("change",function(e){
   if(v) applyVersion(v, false);
 });
 function applySeed(){
-  DATA.as_of="2026-03-15";
+  DATA.as_of="2025-09-04";
   RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()};
   rebuildYulu();
   resetRateCard();
