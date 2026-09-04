@@ -127,12 +127,12 @@ tbody tr:hover{background:#f8fafc}
 .tree-wrap svg{display:block}
 .tlink{fill:none;stroke:#cbd5e1;stroke-width:2}
 .tlink-act{stroke:#94a3b8}
-.snode{width:100%;height:100%;border:2px solid;border-radius:8px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2px 4px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
-.snode .tname{font-size:9px;font-weight:700;color:var(--navy);line-height:1.05;max-width:100%;word-break:break-word}
+.snode{width:100%;height:100%;border:2px solid;border-radius:10px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px 4px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.snode .tname{font-size:10px;font-weight:700;color:var(--navy);line-height:1.1;max-width:100%;word-break:break-word}
 .snode .tsub2{font-size:8px;color:var(--muted);font-weight:500;line-height:1.05;margin-top:1px}
-.snode .tcount{font-size:15px;font-weight:700;color:var(--navy);margin:0}
+.snode .tcount{font-size:18px;font-weight:700;color:var(--navy);margin:1px 0 0}
 .snode .tconv{font-size:8px;color:var(--muted);line-height:1.05}
-.snode .taction{font-size:8px;font-weight:700;margin-top:2px;padding:1px 5px;border-radius:9px;line-height:1.2;white-space:nowrap}
+.snode .taction{font-size:8px;font-weight:700;margin-top:2px;padding:1px 6px;border-radius:10px;line-height:1.25;white-space:nowrap}
 .snode.root{border-color:var(--navy);background:linear-gradient(135deg,#0b2545,#13315c);color:#fff}
 .snode.root .tname{color:#fff}.snode.root .tcount{color:#fff}.snode.root .tconv{color:rgba(255,255,255,.7)}
 .snode.assessed{border-color:var(--blue);background:#eff6ff}
@@ -932,30 +932,23 @@ function treeHTML(){
     ]
   };
   let leafCounter=0,maxLevel=0,numLeaves=0;
-  // First pass: assign x slots and find max depth
-  function assignX(n,level){
-    if(level>maxLevel)maxLevel=level;
+  function layout(n,level){
+    n.level=level;if(level>maxLevel)maxLevel=level;
     if(!n.children||!n.children.length){n.xs=leafCounter++;numLeaves++;}
-    else{n.children.forEach(c=>assignX(c,level+1));n.xs=(n.children[0].xs+n.children[n.children.length-1].xs)/2;}
+    else{n.children.forEach(c=>layout(c,level+1));n.xs=(n.children[0].xs+n.children[n.children.length-1].xs)/2;}
   }
-  assignX(TREE,0);
-  // Second pass: bottom-align leaves to the deepest row, internal nodes centered above children
-  function assignY(n,level){
-    if(!n.children||!n.children.length){n.row=maxLevel;}       // leaf → bottom row
-    else{n.children.forEach(c=>assignY(c,level+1));n.row=level;} // internal → its natural level
-  }
-  assignY(TREE,0);
-  const nodeW=120,nodeH=58,xGap=6,yGap=16,pad=12;
+  layout(TREE,0);
+  const nodeW=132,nodeH=70,xGap=4,yGap=24,pad=14;
   const xPix=s=>pad+s*(nodeW+xGap);
-  const yPix=r=>pad+r*(nodeH+yGap);
+  const yPix=l=>pad+l*(nodeH+yGap);
   const W=pad*2+numLeaves*(nodeW+xGap)-xGap;
   const H=pad*2+(maxLevel+1)*nodeH+maxLevel*yGap;
   let nodes='',conns='';
   function nodeHTML(n){
-    const x=xPix(n.xs),y=yPix(n.row);
+    const x=xPix(n.xs),y=yPix(n.level);
     nodes+=`<foreignObject x="${x}" y="${y}" width="${nodeW}" height="${nodeH}"><div xmlns="http://www.w3.org/1999/xhtml" class="snode ${n.type||''}"><div class="tname">${n.name}</div>${n.sub2?`<div class="tsub2">${n.sub2}</div>`:''}<div class="tcount">${n.count}</div>${n.sub?`<div class="tconv">${n.sub}</div>`:''}${n.action?`<div class="taction ${n.actionCls||''}">${n.action}</div>`:''}</div></foreignObject>`;
     if(n.children){n.children.forEach(c=>{
-      const cx=xPix(c.xs),cy=yPix(c.row),midY=y+nodeH+(cy-(y+nodeH))/2;
+      const cx=xPix(c.xs),cy=yPix(c.level),midY=y+nodeH+(cy-(y+nodeH))/2;
       const cls=(c.type||'').startsWith('leaf')?'tlink tlink-act':'tlink';
       conns+=`<path d="M ${x+nodeW/2} ${y+nodeH} V ${midY} H ${cx+nodeW/2} V ${cy}" class="${cls}"/>`;
       nodeHTML(c);
