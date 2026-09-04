@@ -908,15 +908,15 @@ function treeHTML(){
     children:[
       {id:'evaluated',name:'Evaluated',count:K.evaluated,sub:pct(K.evaluated,K.total)+' of total',type:'assessed',children:[
         {id:'feasible',name:'Feasible',count:K.feasible,sub:pct(K.feasible,K.evaluated)+' of eval',type:'feasible',children:[
+          {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber'},
           {id:'noc_ok',name:'NOC Approved',count:K.nocApproved,sub:pct(K.nocApproved,K.feasible)+' of feas',type:'noc',children:[
+            {id:'nl_vden',name:'Denied by Vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber'},
             {id:'station_live',name:'Station Live',count:K.stationLive,sub:pct(K.stationLive,K.nocApproved)+' of NOC ✓',type:'rollout',action:'→ Final Rollout',actionCls:'act-green'},
             {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',children:[
               {id:'nl_wip30',name:'< 30 days',count:K.nlWip+K.nlOverdue,sub:'of WIP',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber'},
               {id:'nl_wip30plus',name:'> 30 days',count:K.nlYetToStart,sub:'of WIP',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber'}
-            ]},
-            {id:'nl_vden',name:'Denied by Vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber'}
-          ]},
-          {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber'}
+            ]}
+          ]}
         ]},
         {id:'notfeas',name:'Not Feasible',count:K.notFeasEval,sub:pct(K.notFeasEval,K.evaluated)+' of eval',type:'notfeasible',children:[
           {id:'space',name:'Space Blocked',count:K.nfSpace,type:'leaf-space',action:'→ Re-site',actionCls:'act-red'},
