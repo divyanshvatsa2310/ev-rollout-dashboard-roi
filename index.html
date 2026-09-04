@@ -907,7 +907,7 @@ function treeHTML(){
     id:'root',name:'Total Pods',count:K.total,sub:`${K.live} live · ${K.upcoming} upc`,type:'root',
     children:[
       {id:'evaluated',name:'Evaluated',count:K.evaluated,sub:pct(K.evaluated,K.total)+' of total',type:'assessed',children:[
-        {id:'feasible',name:'Feasible',sub2:'space+power ✓',count:K.feasible,sub:pct(K.feasible,K.evaluated)+' of eval',type:'feasible',children:[
+        {id:'feasible',name:'Feasible',count:K.feasible,sub:pct(K.feasible,K.evaluated)+' of eval',type:'feasible',children:[
           {id:'noc_ok',name:'NOC Approved',count:K.nocApproved,sub:pct(K.nocApproved,K.feasible)+' of feas',type:'noc',children:[
             {id:'station_live',name:'Station Live',count:K.stationLive,sub:pct(K.stationLive,K.nocApproved)+' of NOC ✓',type:'rollout',action:'→ Final Rollout',actionCls:'act-green'},
             {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',children:[
@@ -927,7 +927,7 @@ function treeHTML(){
           {id:'both',name:'Both Blocked',count:K.nfBoth,type:'leaf-both',action:'→ Deprioritize',actionCls:'act-red'}
         ]}
       ]},
-      {id:'under_eval',name:'Under Evaluation',sub2:'explicit callout',count:K.underEval,sub:pct(K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Await RE check',actionCls:'act-blue'},
+      {id:'under_eval',name:'Under Evaluation',count:K.underEval,sub:pct(K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Await RE check',actionCls:'act-blue'},
       {id:'not_eval',name:'Not Evaluated',count:K.total-K.evaluated-K.underEval,sub:pct(K.total-K.evaluated-K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Complete assessment',actionCls:'act-blue'}
     ]
   };
