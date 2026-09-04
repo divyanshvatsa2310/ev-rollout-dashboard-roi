@@ -154,6 +154,26 @@ tbody tr:hover{background:#f8fafc}
 .snode .taction.act-blue{background:#dbeafe;color:#1e40af}
 .snode .taction.act-purple{background:#ede9fe;color:#5b21b6}
 .snode .taction.act-grey{background:#f1f5f9;color:#475569}
+/* Yulu priority badge inside tree nodes */
+.yulu-badge{display:inline-block;font-size:7px;font-weight:800;line-height:1;padding:1px 3px;border-radius:4px;margin-left:3px;vertical-align:middle}
+.yulu-p0{background:#16a34a;color:#fff}
+.yulu-p1{background:#f59e0b;color:#fff}
+.yulu-p2{background:#ef4444;color:#fff}
+.yulu-p3{background:#94a3b8;color:#fff}
+.yulu-p4{background:#cbd5e1;color:#475569}
+.yulu-none{background:#f1f5f9;color:#94a3b8}
+#yuluToggle.on{background:#dcfce7;color:#166534;border-color:#16a34a}
+#yuluToggle.on #yuluDot{background:#16a34a}
+/* Yulu priority badge inside tree nodes */
+.yulu-badge{display:inline-block;font-size:7px;font-weight:800;line-height:1;padding:1px 3px;border-radius:4px;margin-left:3px;vertical-align:middle}
+.yulu-p0{background:#16a34a;color:#fff}
+.yulu-p1{background:#f59e0b;color:#fff}
+.yulu-p2{background:#ef4444;color:#fff}
+.yulu-p3{background:#94a3b8;color:#fff}
+.yulu-p4{background:#cbd5e1;color:#475569}
+.yulu-none{background:#f1f5f9;color:#94a3b8}
+#yuluToggle.on{background:#dcfce7;color:#166534;border-color:#16a34a}
+#yuluToggle.on #yuluDot{background:#16a34a}
 .tree-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);margin-top:14px;justify-content:center}
 .tree-legend span{display:flex;align-items:center;gap:5px}
 .tree-legend i{width:14px;height:10px;border-radius:3px;border:2px solid;display:inline-block}
@@ -342,6 +362,9 @@ tbody tr:hover{background:#f8fafc}
         <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
       </label>
       <button class="btn" id="saveBtn" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;background:var(--green);color:#fff;border-color:var(--green)">💾 Save</button>
+      <label class="btn" id="yuluToggle" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;color:#475569" title="Show Yulu priority on each tree node">
+        <span id="yuluDot" style="width:10px;height:10px;border-radius:50%;background:#cbd5e1;display:inline-block"></span> Yulu Check
+      </label>
       <span class="chip" id="uploadStatus" style="display:none"></span>
     </div>
   </div>
@@ -632,7 +655,24 @@ function parseWorkbook(wb){
         notes:gR(r,"notes")||""});
     }
   }
-  return {universe,assessed,roi};
+  // Yulu Launch Plan — parsed by header name; keyed by lowercased pod name for joining to assessed pods
+  // Columns: Pod Code, Pod Name, City, State, Store Lat, Store Long, Priority (P0/P1/P2), Remarks
+  const yulu=[];
+  const wsY=wb.Sheets["Yulu Launch Plan"]||wb.Sheets["Yulu plan"]||wb.Sheets["YuluPlan"]||wb.Sheets["Yulu"];
+  if(wsY){
+    const yHdr=(XLSX.utils.sheet_to_json(wsY,{header:1,defval:null,range:0})[0])||[];
+    const colY={};
+    yHdr.forEach((h,i)=>{ if(h!=null&&String(h).trim()!=="") colY[String(h).trim().toLowerCase()]=i; });
+    const gY=(r,name)=>{ const i=colY[name]; return (i!=null)?r[i]:undefined; };
+    const yRows=XLSX.utils.sheet_to_json(wsY,{header:1,defval:null,range:1});
+    for(const r of yRows){
+      const name=String(gY(r,"pod name")||gY(r,"pod_name")||"").trim();
+      if(!name) continue;
+      const pr=String(gY(r,"priority")||"").trim().toUpperCase();
+      yulu.push({pod_name:name, priority:pr||"", remarks:String(gY(r,"remarks")||"").trim()});
+    }
+  }
+  return {universe,assessed,roi,yulu};
 }
 
 function applyData(newData){
@@ -692,7 +732,8 @@ document.getElementById("fileInput").addEventListener("change",function(e){
       const data=new Uint8Array(ev.target.result);
       const wb=XLSX.read(data,{type:"array",cellDates:true});
       const parsed=parseWorkbook(wb);
-      RAW={universe:parsed.universe,assessed:parsed.assessed,roi:parsed.roi};
+      RAW={universe:parsed.universe,assessed:parsed.assessed,roi:parsed.roi,yulu:parsed.yulu||[]};
+      rebuildYulu();
       CITY="All"; document.getElementById("cityFilter").value="All";
       populateCities();
       // as_of = today (the upload date); this drives all "view as on date" date math
@@ -702,7 +743,7 @@ document.getElementById("fileInput").addEventListener("change",function(e){
       ROI=buildROI();   // rebuild ROI cards from the freshly-uploaded sheet
       document.getElementById("batch").textContent="Batch: "+file.name;
       // stash the live (unsaved) blob so Save + the dropdown can reach it
-      window.__LIVE={raw:{universe:parsed.universe.slice(),assessed:parsed.assessed.slice(),roi:parsed.roi.slice()}, as_of:DATA.as_of, batch:file.name, rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
+      window.__LIVE={raw:{universe:parsed.universe.slice(),assessed:parsed.assessed.slice(),roi:parsed.roi.slice(),yulu:(parsed.yulu||[]).slice()}, as_of:DATA.as_of, batch:file.name, rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
       refreshVersionDropdown("live");
       status.textContent="✓ Loaded: "+kpis.total+" pods, "+kpis.assessed+" assessed · as-of "+DATA.as_of;
       status.style.color="#86efac";
@@ -772,7 +813,8 @@ document.getElementById("asof").addEventListener("change",function(e){
 });
 function applySeed(){
   DATA.as_of="2026-03-15";
-  RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice()};
+  RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()};
+  rebuildYulu();
   resetRateCard();
   CITY="All"; document.getElementById("cityFilter").value="All";
   const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
@@ -783,7 +825,8 @@ function applySeed(){
 function applyLive(){
   const L=window.__LIVE; if(!L) return;
   DATA.as_of=L.as_of;
-  RAW={universe:L.raw.universe.slice(),assessed:L.raw.assessed.slice(),roi:L.raw.roi.slice()};
+  RAW={universe:L.raw.universe.slice(),assessed:L.raw.assessed.slice(),roi:L.raw.roi.slice(),yulu:(L.raw.yulu||[]).slice()};
+  rebuildYulu();
   if(L.rateCard){ Object.keys(RATE_CARD).forEach(k=>delete RATE_CARD[k]); Object.assign(RATE_CARD,L.rateCard); }
   CITY="All"; document.getElementById("cityFilter").value="All";
   const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
@@ -793,7 +836,8 @@ function applyLive(){
 }
 function applyVersion(ver, isSave){
   DATA.as_of=ver.as_of;
-  RAW={universe:ver.raw.universe.slice(),assessed:ver.raw.assessed.slice(),roi:ver.raw.roi.slice()};
+  RAW={universe:ver.raw.universe.slice(),assessed:ver.raw.assessed.slice(),roi:ver.raw.roi.slice(),yulu:(ver.raw.yulu||[]).slice()};
+  rebuildYulu();
   if(ver.rateCard){ Object.keys(RATE_CARD).forEach(k=>delete RATE_CARD[k]); Object.assign(RATE_CARD,ver.rateCard); rerenderRateEditor(); }
   CITY="All"; document.getElementById("cityFilter").value="All";
   const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
@@ -803,9 +847,46 @@ function applyVersion(ver, isSave){
 }
 
 /* ============ CITY FILTER ============ */
-let RAW={universe:[],assessed:[],roi:[]};      // current parsed pod-level data
-let CITY="All";                                // selected region filter: All | Top4 | Top7
-let ROI=[];                                    // ROI cards (rebuilt from RAW.roi by buildROI)
+let RAW={universe:[],assessed:[],roi:[],yulu:[]};      // current parsed pod-level data
+let YULU=new Map();                                      // pod_name(lower) → {priority, remarks}
+let YULU_ON=false;                                       // toggle: show Yulu priority badges in tree
+let CITY="All";                                          // selected region filter: All | Top4 | Top7
+let ROI=[];                                              // ROI cards (rebuilt from RAW.roi by buildROI)
+// Build the Yulu lookup map from RAW.yulu (called after every upload / version swap / seed reset)
+function rebuildYulu(){
+  YULU=new Map();
+  for(const y of RAW.yulu||[]){
+    if(y.priority) YULU.set(String(y.pod_name).trim().toLowerCase(), y);
+  }
+}
+// Count Yulu priorities among a set of assessed pods (returns {P0,P1,P2,none} counts)
+function yuluCountsForPods(pods){
+  const out={P0:0,P1:0,P2:0,P3:0,P4:0,none:0};
+  for(const p of pods){
+    const y=YULU.get(String(p.pod_name||"").trim().toLowerCase());
+    const pr=y?y.priority:"";
+    if(out[pr]!=null) out[pr]++; else out.none++;
+  }
+  return out;
+}
+// Dominant Yulu priority for a pod set (the highest priority present, for badge display)
+function yuluDominant(pods){
+  const c=yuluCountsForPods(pods);
+  if(c.P0) return "P0";
+  if(c.P1) return "P1";
+  if(c.P2) return "P2";
+  if(c.P3) return "P3";
+  if(c.P4) return "P4";
+  return "none";
+}
+// Return a short Yulu badge HTML for a given dominant priority (empty if toggle off)
+function yuluBadge(pods){
+  if(!YULU_ON) return "";
+  const d=yuluDominant(pods);
+  if(d==="none") return `<span class="yulu-badge yulu-none" title="No Yulu data">—</span>`;
+  const cls={P0:"yulu-p0",P1:"yulu-p1",P2:"yulu-p2",P3:"yulu-p3",P4:"yulu-p4"}[d];
+  return `<span class="yulu-badge ${cls}" title="Yulu priority (highest present in this branch)">${d}</span>`;
+}
 const TOP4=["Delhi","Gurgaon","Noida","Mumbai","Bangalore","Hyderabad"];      // NCR=Delhi+Gurgaon+Noida
 const TOP7=[...TOP4,"Kolkata","Pune","Chennai"];
 const NCR=["Delhi","Gurgaon","Noida","Faridabad"];
@@ -955,11 +1036,18 @@ function recompute(){
   ROI=buildROI();   // refresh ROI cards from uploaded sheet (region-aware via RAW)
 }
 // init RAW from seed
-RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice()};
+RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()};
+rebuildYulu();
 ROI=buildROI();   // build initial ROI cards from seeded data
 populateCities();
 refreshVersionDropdown("seed");
 document.getElementById("cityFilter").addEventListener("change",e=>{ CITY=e.target.value; recompute(); });
+// Yulu toggle: show/hide priority badges on tree nodes
+document.getElementById("yuluToggle").addEventListener("click",function(){
+  YULU_ON=!YULU_ON;
+  this.classList.toggle("on",YULU_ON);
+  renderT0();   // re-render the tree with/without badges
+});
 
 /* ============ DRILL-THROUGH ============ */
 // Map a tile click to the set of pods it represents (respects current region filter)
@@ -1053,32 +1141,56 @@ function approachHTML(){
 
 /* ============ SVG TREE ============ */
 function treeHTML(){
+  const a=RAW.assessed.filter(p=>inRegion(p,CITY));   // all assessed pods in current region
+  const known=(v)=>v==="Y"||v==="N";
+  const pending=(v)=>v==="wip";
+  const eP=a.filter(p=>known(p.space_available)&&known(p.power_available));   // evaluated
+  const fP=eP.filter(p=>p.feasible);                                          // feasible
+  const nfP=eP.filter(p=>!p.feasible);                                         // not feasible
+  const nocYesLive=fP.filter(p=>p.store_status==="live"&&p.noc_status==="Yes");
+  const nocYesUpc=a.filter(p=>p.store_status==="upcoming_live");
+  const nocOkP=[...nocYesLive,...nocYesUpc];                                    // NOC approved pods
+  const stationLiveP=nocYesLive.filter(p=>p.ev_live);
+  const nlP=nocYesLive.filter(p=>!p.ev_live);                                  // not-live under NOC yes
+  const deniedP=nlP.filter(p=>/rejected by vendor/i.test(String(p.notes||"")));
+  const nlRest=nlP.filter(p=>!/rejected by vendor/i.test(String(p.notes||"")));
+  const asOfDate=new Date(DATA.as_of);
+  const wip30P=nlRest.filter(p=>p.target_go_live&&within30(p.target_go_live,asOfDate))
+                     .concat(nlRest.filter(p=>{if(!p.target_go_live) return false; const dd=daysFrom(p.target_go_live,asOfDate); return dd!==null&&dd<0;}));
+  const wip30plusP=nlRest.filter(p=>isYetToStartAsOf(p,asOfDate));
+  const underEvalP=a.filter(p=>pending(p.space_available)||pending(p.power_available));
+  const notEvalP=a.filter(p=>!(known(p.space_available)&&known(p.power_available)) && !(pending(p.space_available)||pending(p.power_available)));
+  const spaceP=nfP.filter(p=>p.space_available==="N"&&p.power_available==="Y");
+  const powerP=nfP.filter(p=>p.space_available==="Y"&&p.power_available==="N");
+  const bothP=nfP.filter(p=>p.space_available==="N"&&p.power_available==="N");
+  const powerVP=RAW.roi.filter(p=>inRegion(p,CITY));   // + vendor interest (ROI sheet pods)
+  const powerNVP=powerP.filter(p=>!RAW.roi.some(r=>String(r.pod_id)===String(p.pod_id)));
   const TREE={
-    id:'root',name:'Total Pods',count:K.total,sub:`${K.live} live · ${K.upcoming} upc`,type:'root',
+    id:'root',name:'Total Pods',count:K.total,sub:`${K.live} live · ${K.upcoming} upc`,type:'root',pods:a,
     children:[
-      {id:'evaluated',name:'Evaluated',count:K.evaluated,sub:pct(K.evaluated,K.total)+' of total',type:'assessed',children:[
-        {id:'feasible',name:'Feasible',count:K.feasible,sub:pct(K.feasible,K.evaluated)+' of eval',type:'feasible',children:[
-          {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber'},
-          {id:'noc_ok',name:'NOC Approved',count:K.nocApproved,sub:pct(K.nocApproved,K.feasible)+' of feas',type:'noc',children:[
-            {id:'nl_vden',name:'Denied by Vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber'},
-            {id:'station_live',name:'Station Live',count:K.stationLive,sub:pct(K.stationLive,K.nocApproved)+' of NOC ✓',type:'rollout',action:'→ Final Rollout',actionCls:'act-green'},
-            {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',children:[
-              {id:'nl_wip30',name:'< 30 days',count:K.nlWip+K.nlOverdue,sub:'of WIP',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber'},
-              {id:'nl_wip30plus',name:'> 30 days',count:K.nlYetToStart,sub:'of WIP',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber'}
+      {id:'evaluated',name:'Evaluated',count:K.evaluated,sub:pct(K.evaluated,K.total)+' of total',type:'assessed',pods:eP,children:[
+        {id:'feasible',name:'Feasible',count:K.feasible,sub:pct(K.feasible,K.evaluated)+' of eval',type:'feasible',pods:fP,children:[
+          {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber',pods:fP.filter(p=>p.store_status==="live"&&p.noc_status!=="Yes")},
+          {id:'noc_ok',name:'NOC Approved',count:K.nocApproved,sub:pct(K.nocApproved,K.feasible)+' of feas',type:'noc',pods:nocOkP,children:[
+            {id:'nl_vden',name:'Denied by Vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber',pods:deniedP},
+            {id:'station_live',name:'Station Live',count:K.stationLive,sub:pct(K.stationLive,K.nocApproved)+' of NOC ✓',type:'rollout',action:'→ Final Rollout',actionCls:'act-green',pods:stationLiveP},
+            {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',pods:nlRest,children:[
+              {id:'nl_wip30',name:'< 30 days',count:K.nlWip+K.nlOverdue,sub:'of WIP',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber',pods:wip30P},
+              {id:'nl_wip30plus',name:'> 30 days',count:K.nlYetToStart,sub:'of WIP',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber',pods:wip30plusP}
             ]}
           ]}
         ]},
-        {id:'notfeas',name:'Not Feasible',count:K.notFeasEval,sub:pct(K.notFeasEval,K.evaluated)+' of eval',type:'notfeasible',children:[
-          {id:'space',name:'Space Blocked',count:K.nfSpace,type:'leaf-space',action:'→ Re-site',actionCls:'act-red'},
-          {id:'power',name:'Power Blocked',count:K.nfPower,type:'leaf-power',action:'→ split on vendor',children:[
-            {id:'power_v',name:'+ Vendor Interest',count:K.nfPowerV,type:'leaf-roi',action:'→ ROI calc',actionCls:'act-purple'},
-            {id:'power_nv',name:'No Vendor',count:K.nfPowerNV,type:'leaf-grey',action:'→ Source vendor',actionCls:'act-grey'}
+        {id:'notfeas',name:'Not Feasible',count:K.notFeasEval,sub:pct(K.notFeasEval,K.evaluated)+' of eval',type:'notfeasible',pods:nfP,children:[
+          {id:'space',name:'Space Blocked',count:K.nfSpace,type:'leaf-space',action:'→ Re-site',actionCls:'act-red',pods:spaceP},
+          {id:'power',name:'Power Blocked',count:K.nfPower,type:'leaf-power',action:'→ split on vendor',pods:powerP,children:[
+            {id:'power_v',name:'+ Vendor Interest',count:K.nfPowerV,type:'leaf-roi',action:'→ ROI calc',actionCls:'act-purple',pods:powerVP},
+            {id:'power_nv',name:'No Vendor',count:K.nfPowerNV,type:'leaf-grey',action:'→ Source vendor',actionCls:'act-grey',pods:powerNVP}
           ]},
-          {id:'both',name:'Both Blocked',count:K.nfBoth,type:'leaf-both',action:'→ Deprioritize',actionCls:'act-red'}
+          {id:'both',name:'Both Blocked',count:K.nfBoth,type:'leaf-both',action:'→ Deprioritize',actionCls:'act-red',pods:bothP}
         ]}
       ]},
-      {id:'under_eval',name:'Under Evaluation',count:K.underEval,sub:pct(K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Await RE check',actionCls:'act-blue'},
-      {id:'not_eval',name:'Not Evaluated',count:K.total-K.evaluated-K.underEval,sub:pct(K.total-K.evaluated-K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Complete assessment',actionCls:'act-blue'}
+      {id:'under_eval',name:'Under Evaluation',count:K.underEval,sub:pct(K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Await RE check',actionCls:'act-blue',pods:underEvalP},
+      {id:'not_eval',name:'Not Evaluated',count:K.total-K.evaluated-K.underEval,sub:pct(K.total-K.evaluated-K.underEval,K.total)+' of total',type:'leaf-assess',action:'→ Complete assessment',actionCls:'act-blue',pods:notEvalP}
     ]
   };
   let leafCounter=0,maxLevel=0,numLeaves=0;
@@ -1096,7 +1208,8 @@ function treeHTML(){
   let nodes='',conns='';
   function nodeHTML(n){
     const x=xPix(n.xs),y=yPix(n.level);
-    nodes+=`<foreignObject x="${x}" y="${y}" width="${nodeW}" height="${nodeH}"><div xmlns="http://www.w3.org/1999/xhtml" class="snode ${n.type||''}"><div class="tname">${n.name}</div>${n.sub2?`<div class="tsub2">${n.sub2}</div>`:''}<div class="tcount">${n.count}</div>${n.sub?`<div class="tconv">${n.sub}</div>`:''}${n.action?`<div class="taction ${n.actionCls||''}">${n.action}</div>`:''}</div></foreignObject>`;
+    const yb=yuluBadge(n.pods||[]);
+    nodes+=`<foreignObject x="${x}" y="${y}" width="${nodeW}" height="${nodeH}"><div xmlns="http://www.w3.org/1999/xhtml" class="snode ${n.type||''}"><div class="tname">${n.name}${yb}</div>${n.sub2?`<div class="tsub2">${n.sub2}</div>`:''}<div class="tcount">${n.count}</div>${n.sub?`<div class="tconv">${n.sub}</div>`:''}${n.action?`<div class="taction ${n.actionCls||''}">${n.action}</div>`:''}</div></foreignObject>`;
     if(n.children){n.children.forEach(c=>{
       const cx=xPix(c.xs),cy=yPix(c.level),midY=y+nodeH+(cy-(y+nodeH))/2;
       const cls=(c.type||'').startsWith('leaf')?'tlink tlink-act':'tlink';
@@ -1114,6 +1227,7 @@ function treeHTML(){
     <span><i style="border-color:var(--amber);background:#fffbeb"></i>NOC stage</span>
     <span><i style="border-color:var(--green);background:#f0fdf4"></i>Final rollout ✓</span>
     <span><i style="border-color:#9a3412;background:#fff7ed"></i>Leaf = action needed</span>
+    <span style="margin-left:8px"><b class="yulu-badge yulu-p0">P0</b> Yulu high &nbsp; <b class="yulu-badge yulu-p1">P1</b> medium &nbsp; <b class="yulu-badge yulu-p2">P2</b> low &nbsp; <b class="yulu-badge yulu-none">—</b> no data</span>
   </div>`;
 }
 
