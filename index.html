@@ -910,13 +910,11 @@ function treeHTML(){
         {id:'feasible',name:'Feasible',sub2:'space+power ✓',count:K.feasible,sub:pct(K.feasible,K.evaluated)+' of eval',type:'feasible',children:[
           {id:'noc_ok',name:'NOC Approved',count:K.nocApproved,sub:pct(K.nocApproved,K.feasible)+' of feas',type:'noc',children:[
             {id:'station_live',name:'Station Live',count:K.stationLive,sub:pct(K.stationLive,K.nocApproved)+' of NOC ✓',type:'rollout',action:'→ Final Rollout',actionCls:'act-green'},
-            {id:'station_notlive',name:'Station Not Live',count:K.stationNotLive,sub:pct(K.stationNotLive,K.nocApproved)+' of NOC ✓',type:'noc',children:[
-              {id:'nl_wip',name:'Work In Progress',sub2:'within 30d live target',count:K.nlWip,sub:'matches Upcoming tile',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber'},
-              {id:'nl_overdue',name:'Overdue',sub2:'target passed · not yet live',count:K.nlOverdue,sub:'of not live',type:'leaf-noc',action:'→ Escalate install',actionCls:'act-red'},
-              {id:'nl_vden',name:'Vendor Denied',sub2:'rejected by vendor',count:K.nlVendorDenied,sub:'of not live',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber'},
-              {id:'nl_yts',name:'Yet to Start',sub2:'NOC Yes · no target or 30+ days out',count:K.nlYetToStart,sub:'of not live',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber'}
+            {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',children:[
+              {id:'nl_wip30',name:'< 30 days',sub2:'target within 30d or overdue',count:K.nlWip+K.nlOverdue,sub:'of WIP',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber'},
+              {id:'nl_wip30plus',name:'> 30 days',sub2:'no target or 30+ days out',count:K.nlYetToStart,sub:'of WIP',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber'}
             ]},
-            {id:'noc_upcoming',name:'Upcoming',sub2:'NOC always Yes',count:K.nocYesUpc,sub:'of NOC ✓',type:'noc',action:'→ Go-live plan',actionCls:'act-blue'}
+            {id:'nl_vden',name:'Denied by Vendor',sub2:'rejected by vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber'}
           ]},
           {id:'noc_declined',name:'NOC No / WIP',count:K.nocNo+'/'+K.nocWip,sub:'of feasible',type:'leaf-noc',action:'→ NOC acceleration',actionCls:'act-amber'}
         ]},
