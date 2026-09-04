@@ -80,7 +80,9 @@ tbody tr:hover{background:#f8fafc}
 
 /* tile KPIs (reference format: horizontal row) */
 .kpi-row{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 14px;margin-bottom:8px;align-items:stretch}
-.kpi-block{flex:0 0 150px;height:186px;display:flex;flex-direction:column;gap:6px}
+.kpi-block{flex:0 0 150px;height:200px;display:flex;flex-direction:column;gap:4px;position:relative}
+.kpi-block::after{content:'↓';position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);font-size:14px;color:#94a3b8;font-weight:700;z-index:2}
+.kpi-block:last-child::after{display:none}
 .kpi-big{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 10px;text-align:center;position:relative;overflow:hidden;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .kpi-big::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--navy)}
 .kpi-big.acc-navy::before{background:var(--navy)}.kpi-big.acc-blue::before{background:var(--blue)}
@@ -90,8 +92,10 @@ tbody tr:hover{background:#f8fafc}
 .kpi-big .lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
 .kpi-big .num{font-size:30px;font-weight:800;color:var(--navy);line-height:1}
 .kpi-big .sub{font-size:10px;color:var(--muted);margin-top:4px}
-.kpi-pair{display:grid;grid-template-columns:1fr 1fr;gap:6px;height:64px;flex:0 0 64px}
-.kpi-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;height:64px;flex:0 0 64px}
+.kpi-pair{display:grid;grid-template-columns:1fr 1fr;gap:6px;height:64px;flex:0 0 64px;margin-top:14px;position:relative}
+.kpi-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;height:64px;flex:0 0 64px;margin-top:14px;position:relative}
+.kpi-pair::before,.kpi-trio::before{content:'';position:absolute;top:-10px;left:50%;width:2px;height:10px;background:#cbd5e1;transform:translateX(-50%)}
+.kpi-pair::after,.kpi-trio::after{content:'↓';position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:10px;color:#94a3b8}
 .kpi-sm{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 4px;text-align:center;height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .kpi-sm .slbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
 .kpi-sm .snum{font-size:18px;font-weight:800;line-height:1}
@@ -581,12 +585,16 @@ function computeKPIs(universe,assessed,roi){
   const powerNo=assessed.filter(p=>p.power_available==="N").length;
   const powerUnknown=assessed.filter(p=>p.power_available==="unknown").length;
   const evLive=assessed.filter(p=>p.ev_live).length;
-  // Upcoming 30d = target_go_live present, actual blank, target within 30 days of TODAY (real today)
+  // Upcoming 30d = target_go_live present, actual blank, target within 30 days of the as-of date
   const within30Today=(iso)=>{ if(!iso) return false; const d=new Date(iso); if(isNaN(d)) return false; const diff=(d-today)/(1000*60*60*24); return diff>=0 && diff<=30; };
   const upcoming30=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)).length;
   // Upcoming 30d split: live vs upcoming (by store_status)
   const upc30Live=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)&&p.store_status==="live").length;
   const upc30Upc=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)&&p.store_status==="upcoming_live").length;
+  // All upcoming = any pod with a target_go_live that's in the future (regardless of 30-day window)
+  const upcomingAll=assessed.filter(p=>p.target_go_live&&!p.ev_live&&new Date(p.target_go_live)>=today).length;
+  const upcomingAllLive=assessed.filter(p=>p.target_go_live&&!p.ev_live&&new Date(p.target_go_live)>=today&&p.store_status==="live").length;
+  const upcomingAllUpc=assessed.filter(p=>p.target_go_live&&!p.ev_live&&new Date(p.target_go_live)>=today&&p.store_status==="upcoming_live").length;
   // Rejected by Yuma = landlord approved (NOC=Yes) but vendor declined (notes: "Rejected by Vendor")
   const rejectedYuma=assessed.filter(p=>p.noc_status==="Yes"&&p.notes&&/rejected by vendor/i.test(String(p.notes))).length;
   // "Yet to start" (updated rule): NOC=Yes AND no issue in notes AND target_go_live is 30+ days from today (or no target)
@@ -615,6 +623,8 @@ function computeKPIs(universe,assessed,roi){
     only_power_yes:onlyPowerYes, only_power_wip:onlyPowerWip, only_power_no:onlyPowerNo, only_power_total:onlyPowerTotal,
     noc_yes:nocYes, noc_no:nocNo, noc_wip:nocWip, noc_yes_live:nocYesLive, noc_yes_upc:nocYesUpc,
     ev_live:evLive, upcoming_30:upcoming30, upcoming_30_live:upc30Live, upcoming_30_upc:upc30Upc, upcoming_30_live:upc30Live, upcoming_30_upc:upc30Upc,
+    upcoming_all:upcomingAll, upcoming_all_live:upcomingAllLive, upcoming_all_upc:upcomingAllUpc,
+    upcoming_all:upcomingAll, upcoming_all_live:upcomingAllLive, upcoming_all_upc:upcomingAllUpc,
     rejected_yuma:rejectedYuma, yet_to_start:yetToStart, out_of_scope:outOfScope, power_blocked_roi:roi.length,
     splits:{total:{l:liveU,u:upcU},assessed:splitA(p=>true),feasible:splitA(p=>p.feasible),
       noc_yes:splitA(p=>p.noc_status==="Yes"),ev_live:splitA(p=>p.ev_live)}
@@ -762,6 +772,8 @@ function applyData(newData){
   K.onlySpaceYes=DATA.only_space_yes; K.onlySpaceWip=DATA.only_space_wip; K.onlySpaceNo=DATA.only_space_no; K.onlySpaceTotal=DATA.only_space_total;
   K.upcoming30=DATA.upcoming_30; K.liveNow=DATA.ev_live;
   K.upc30Split={l:DATA.upcoming_30_live,u:DATA.upcoming_30_upc};
+  K.upcomingAll=DATA.upcoming_all||0; K.upcomingAllSplit={l:DATA.upcoming_all_live||0,u:DATA.upcoming_all_upc||0};
+  K.upcomingAll=DATA.upcoming_all||0; K.upcomingAllSplit={l:DATA.upcoming_all_live||0,u:DATA.upcoming_all_upc||0};
   K.upc30Split={l:DATA.upcoming_30_live,u:DATA.upcoming_30_upc};
   K.rejectedYuma=DATA.rejected_yuma; K.yetToStart=DATA.yet_to_start;
   K.coverage=DATA.total?(DATA.ev_live/DATA.total*100).toFixed(0):0;
@@ -1351,9 +1363,9 @@ function overviewHTML(){
         <div class="clbl">Live</div><div class="cnum">${K.liveNow}</div>
         <div class="csplit"><span class="cl">${K.liveSplit.l}</span><span class="sep">/</span><span class="cu">${K.liveSplit.u}</span></div>
       </div>
-      <div class="kpi-cell upc-cell" onclick="openModal('Upcoming (target set, actual blank)','upcoming30')">
-        <div class="clbl">Upcoming</div><div class="cnum">${K.upcoming30}</div>
-        <div class="csplit"><span class="cl">${K.upc30Split.l}</span><span class="sep">/</span><span class="cu">${K.upc30Split.u}</span></div>
+      <div class="kpi-cell upc-cell" onclick="openModal('Upcoming (target go-live set)','upcomingAll')">
+        <div class="clbl">Upcoming</div><div class="cnum">${K.upcomingAll}</div>
+        <div class="csplit"><span class="cl">${K.upcomingAllSplit.l}</span><span class="sep">/</span><span class="cu">${K.upcomingAllSplit.u}</span></div>
       </div>
       <div class="kpi-cell rej-cell" onclick="openModal('Rejected by Yuma','rejectedYuma')">
         <div class="clbl">Rejected by Yuma</div><div class="cnum">${K.rejectedYuma}</div>
