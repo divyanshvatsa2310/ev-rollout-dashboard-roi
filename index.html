@@ -1193,30 +1193,9 @@ function overviewHTML(){
 }
 function renderT0(){
   const a0=cityAssessed();
-  const blkSpace=a0.filter(p=>p.space_available==="N").length;
-  const blkPower=a0.filter(p=>p.power_available==="N").length;
-  const blkNoc=a0.filter(p=>p.store_status==="live"&&p.feasible&&p.noc_status!=="Yes").length;
-  const blkVendor=a0.filter(p=>/reject/i.test(String(p.notes||""))).length;
   document.getElementById('t0').innerHTML=`
   ${overviewHTML()}
   ${approachHTML()}
-  <div class="card"><h3>Blockers <span class="sow">non-exclusive — a pod can appear in more than one bucket</span></h3>
-    <div class="lanes">
-      <div class="lane space" onclick="openModal('No Space','blk_space')" style="cursor:pointer">
-        <div class="h">No Space</div><div class="v">${blkSpace}</div><div class="d">Re-site / deprioritize</div>
-      </div>
-      <div class="lane power" onclick="openModal('No Power','blk_power')" style="cursor:pointer">
-        <div class="h">No Power</div><div class="v">${blkPower}</div><div class="d">Power enhancement / ROI</div>
-      </div>
-      <div class="lane noc" onclick="openModal('No NOC','blk_noc')" style="cursor:pointer">
-        <div class="h">No NOC</div><div class="v">${blkNoc}</div><div class="d">NOC acceleration</div>
-      </div>
-      <div class="lane vendor" onclick="openModal('Vendor not willing','blk_vendor')" style="cursor:pointer">
-        <div class="h">Vendor not willing</div><div class="v">${blkVendor}</div><div class="d">Reassign vendor</div>
-      </div>
-    </div>
-    <div class="small muted" style="margin-top:8px">A pod with both space and power blocked appears in both buckets. Counts overlap and do not sum to total.</div>
-  </div>
   <div class="card"><h3>Funnel — Decision Tree <span class="sow">each leaf = an action someone owns · scroll horizontally if needed</span></h3>${treeHTML()}</div>`;
 }
 
