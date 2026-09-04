@@ -1373,10 +1373,9 @@ function renderT1(){
     return;
   }
 
-  // Build a 12-month forward window from the as-of date
-  const asOf=new Date(DATA.as_of); asOf.setDate(1);
+  // Fixed window: July 2026 → March 2027 (9 months)
   const months=[];
-  for(let i=0;i<12;i++){ months.push(new Date(asOf.getFullYear(),asOf.getMonth()+i,1)); }
+  for(let i=0;i<9;i++){ months.push(new Date(2026,6+i,1)); }   // month 6 = July (0-indexed)
   const mKey=m=>`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
   const mLabel=m=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m.getMonth()]+' '+m.getFullYear();
 
@@ -1425,7 +1424,7 @@ function renderT1(){
         <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?'<div class="vg-mo-count">+${r.total} this mo</div>':''}</div>
       </div>`).join('')}
   </div>
-  <div class="small muted" style="margin-top:10px">${dated.length} pod(s) with go-live dates across the next 12 months from ${mLabel(months[0])}. Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
+  <div class="small muted" style="margin-top:10px">${dated.length} pod(s) with go-live dates · window ${mLabel(months[0])} → ${mLabel(months[months.length-1])}. Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
   </div>`;
 }
 
