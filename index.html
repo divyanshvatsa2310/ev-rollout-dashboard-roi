@@ -323,8 +323,11 @@ tbody tr:hover{background:#f8fafc}
       <div class="sub">Coverage funnel · opening projection · power-enhancement ROI</div>
     </div>
     <div class="meta">
-      <span class="chip" id="asof">Data as of —</span>
+      <select id="asof" class="chip" title="View as on date" style="cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--navy);font-weight:600;font-size:12px;max-width:260px">
+        <option value="seed">Seed baseline — 2026-03-15</option>
+      </select>
       <span class="chip" id="batch">Batch —</span>
+      <span class="chip" id="dirtyFlag" style="display:none;background:#fef3c7;color:#92400e;border-color:#f59e0b">● Unsaved changes</span>
       <select id="cityFilter" class="chip" style="cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--navy);font-weight:600;font-size:12px;max-width:160px">
         <option value="All">All</option>
         <option value="Top4">Top 4</option>
@@ -334,6 +337,7 @@ tbody tr:hover{background:#f8fafc}
         ⬆ Upload .xlsx
         <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
       </label>
+      <button class="btn" id="saveBtn" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;background:var(--green);color:#fff;border-color:var(--green)">💾 Save</button>
       <span class="chip" id="uploadStatus" style="display:none"></span>
     </div>
   </div>
@@ -433,6 +437,22 @@ function daysFromToday(iso){
   if(isNaN(d)) return null;
   return Math.round((d - new Date())/(1000*60*60*24));
 }
+// Today as YYYY-MM-DD (used for upload as_of and version labels)
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+// Days from a reference date to an ISO date (positive = future, negative = past). null/invalid => null.
+function daysFrom(iso,ref){
+  if(!iso) return null;
+  const d=new Date(iso); if(isNaN(d)) return null;
+  return Math.round((d - ref)/(1000*60*60*24));
+}
+// As-of-aware "yet to start": target 30+ days out (or no target) relative to the as-of date
+function isYetToStartAsOf(p,ref){
+  if(p.noc_status!=="Yes") return false;
+  if(notesHasIssue(p)) return false;
+  if(!p.target_go_live) return true;
+  const dd=daysFrom(p.target_go_live,ref);
+  return dd===null || dd>=30;
+}
 // "Has an issue in notes" = notes mention a blocker/problem keyword (vendor rejection, blocked, pending, exceeds, low traffic, negotiating, etc.)
 const NOTES_ISSUE_RE=/reject|blocked|block|pending|exceeds|exceed|low traffic|negotiat|on hold|stalled|delay|await|hold/i;
 function notesHasIssue(p){ const n=String(p.notes||"").trim(); return n!=="" && NOTES_ISSUE_RE.test(n); }
@@ -447,7 +467,7 @@ function isYetToStart(p){
 
 function computeKPIs(universe,assessed,roi){
   const asOf=new Date(DATA.as_of);
-  const today=new Date();   // real today, for the upcoming-30d window
+  const today=asOf;   // "view as on date": all date windows are relative to the selected as-of date, not real today
   const total=universe.length;
   const liveU=universe.filter(p=>p.store_status==="live").length;
   const upcU=universe.filter(p=>p.store_status==="upcoming_live").length;
@@ -613,6 +633,7 @@ function parseWorkbook(wb){
 
 function applyData(newData){
   Object.assign(DATA,newData);
+  const asOfDate=new Date(DATA.as_of);   // "view as on date" reference
   // Rebuild K from DATA
   K.total=DATA.total; K.live=DATA.live_universe; K.upcoming=DATA.upcoming_universe;
   K.assessed=DATA.assessed; K.evaluated=DATA.evaluated; K.underEval=DATA.under_eval; K.feasible=DATA.feasible; K.notFeasEval=DATA.not_feas_eval;
@@ -627,14 +648,14 @@ function applyData(newData){
   const nl=RAW.assessed.filter(p=>p.store_status==="live"&&p.feasible&&p.noc_status==="Yes"&&!p.ev_live);
   K.stationNotLive=nl.length;
   K.nlVendorDenied=nl.filter(p=>/rejected by vendor/i.test(String(p.notes||""))).length;
-  // Among not-live pods that are NOT vendor-denied, split by target_go_live timing vs today:
+  // Among not-live pods that are NOT vendor-denied, split by target_go_live timing vs the as-of date:
   const nlRest=nl.filter(p=>!/rejected by vendor/i.test(String(p.notes||"")));
-  // WIP = target within the next 30 days
-  K.nlWip=nlRest.filter(p=>p.target_go_live&&within30(p.target_go_live,new Date())).length;
-  // Overdue = target in the past (target set, daysFromToday<0) but not yet live
-  K.nlOverdue=nlRest.filter(p=>{if(!p.target_go_live) return false; const dd=daysFromToday(p.target_go_live); return dd!==null&&dd<0;}).length;
+  // WIP = target within the next 30 days (relative to the as-of date)
+  K.nlWip=nlRest.filter(p=>p.target_go_live&&within30(p.target_go_live,asOfDate)).length;
+  // Overdue = target in the past (target set, daysFromAsOf<0) but not yet live
+  K.nlOverdue=nlRest.filter(p=>{if(!p.target_go_live) return false; const dd=daysFrom(p.target_go_live,asOfDate); return dd!==null&&dd<0;}).length;
   // Yet to Start (updated rule) = no issue in notes AND (no target OR target 30+ days out)
-  K.nlYetToStart=nlRest.filter(p=>isYetToStart(p)).length;
+  K.nlYetToStart=nlRest.filter(p=>isYetToStartAsOf(p,asOfDate)).length;
   DATA.station_live=K.stationLive; DATA.station_not_live=K.stationNotLive;
   DATA.nl_vendor_denied=K.nlVendorDenied; DATA.nl_wip30=K.nlWip; DATA.nl_yet_to_start=K.nlYetToStart; DATA.nl_overdue=K.nlOverdue;
   K.nocYesLive=DATA.noc_yes_live; K.nocYesUpc=DATA.noc_yes_upc;
@@ -670,11 +691,18 @@ document.getElementById("fileInput").addEventListener("change",function(e){
       RAW={universe:parsed.universe,assessed:parsed.assessed,roi:parsed.roi};
       CITY="All"; document.getElementById("cityFilter").value="All";
       populateCities();
+      // as_of = today (the upload date); this drives all "view as on date" date math
+      DATA.as_of = todayISO();
       const kpis=computeKPIs(parsed.universe,parsed.assessed,parsed.roi);
       applyData(kpis);
+      ROI=buildROI();   // rebuild ROI cards from the freshly-uploaded sheet
       document.getElementById("batch").textContent="Batch: "+file.name;
-      status.textContent="✓ Loaded: "+kpis.total+" pods, "+kpis.assessed+" assessed";
+      // stash the live (unsaved) blob so Save + the dropdown can reach it
+      window.__LIVE={raw:{universe:parsed.universe.slice(),assessed:parsed.assessed.slice(),roi:parsed.roi.slice()}, as_of:DATA.as_of, batch:file.name, rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
+      refreshVersionDropdown("live");
+      status.textContent="✓ Loaded: "+kpis.total+" pods, "+kpis.assessed+" assessed · as-of "+DATA.as_of;
       status.style.color="#86efac";
+      markDirty(true);
     }catch(err){
       status.textContent="✗ "+err.message; status.style.color="#fca5a5";
       console.error(err);
@@ -682,6 +710,93 @@ document.getElementById("fileInput").addEventListener("change",function(e){
   };
   reader.readAsArrayBuffer(file);
 });
+
+/* ============ PERSISTENCE: Save + View-as-on-date versions ============ */
+// Versions are stored in localStorage under "evr_versions" as { id, label, as_of, batch, raw:{...}, rateCard:{...} }.
+// "live" is an in-memory transient state (uploaded but not yet saved). "seed" is the original baseline.
+const VER_KEY="evr_versions";
+function loadVersions(){ try{ return JSON.parse(localStorage.getItem(VER_KEY)||"[]"); }catch{ return []; } }
+function saveVersions(v){ localStorage.setItem(VER_KEY, JSON.stringify(v)); }
+function refreshVersionDropdown(selected){
+  const sel=document.getElementById("asof");
+  const v=loadVersions();
+  const cur=sel.value;
+  // rebuild options: seed baseline + all saved versions (newest first)
+  sel.innerHTML='<option value="seed">Seed baseline — 2026-03-15</option>';
+  v.slice().reverse().forEach(ver=>{
+    const o=document.createElement("option"); o.value=ver.id; o.textContent=ver.label; sel.appendChild(o);
+  });
+  // transient "live" entry (uploaded-but-unsaved) — shown only when present
+  if(window.__LIVE){ const o=document.createElement("option"); o.value="live"; o.textContent="Live (unsaved upload) — "+window.__LIVE.as_of; sel.appendChild(o); }
+  sel.value = selected || cur || "seed";
+}
+function markDirty(yes){
+  const f=document.getElementById("dirtyFlag"); if(f) f.style.display = yes ? "inline-block" : "none";
+}
+// Save current live state (uploaded or seed) as a new named version
+document.getElementById("saveBtn").addEventListener("click",function(){
+  // what is "current"? if a saved version is selected, we save a copy of it; if live, save the live blob; else seed
+  const sel=document.getElementById("asof").value;
+  let blob;
+  if(sel==="live" && window.__LIVE){ blob={raw:window.__LIVE.raw, as_of:window.__LIVE.as_of, batch:window.__LIVE.batch, rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
+  else if(sel==="seed"){ blob={raw:{universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice()}, as_of:DATA.as_of, batch:"Seed baseline", rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
+  else {
+    const v=loadVersions(); const found=v.find(x=>x.id===sel);
+    if(!found){ alert("Nothing to save — upload a file first."); return; }
+    blob={raw:found.raw, as_of:found.as_of, batch:found.batch, rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
+  }
+  const name=prompt("Name this version (e.g. "+todayISO()+" upload):", "Snapshot "+todayISO());
+  if(!name) return;
+  const id="v_"+Date.now();
+  const ver={id, label:name+" — "+blob.as_of, as_of:blob.as_of, batch:blob.batch, raw:blob.raw, rateCard:blob.rateCard};
+  const all=loadVersions(); all.push(ver); saveVersions(all);
+  // keep the live blob in memory too so re-selecting "live" still works, then clear dirty
+  if(window.__LIVE){ window.__LIVE.raw=blob.raw; }
+  applyVersion(ver, true);
+  refreshVersionDropdown(id);
+  markDirty(false);
+  const status=document.getElementById("uploadStatus"); status.style.display="inline-block"; status.textContent="✓ Saved: "+name; status.style.color="#86efac";
+  setTimeout(()=>{ status.style.display="none"; }, 4000);
+});
+// Switch active dataset when the dropdown changes
+document.getElementById("asof").addEventListener("change",function(e){
+  const id=e.target.value;
+  if(id==="live" && window.__LIVE){ applyLive(); return; }
+  if(id==="seed"){ applySeed(); return; }
+  const v=loadVersions().find(x=>x.id===id);
+  if(v) applyVersion(v, false);
+});
+function applySeed(){
+  DATA.as_of="2026-03-15";
+  RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice()};
+  resetRateCard();
+  CITY="All"; document.getElementById("cityFilter").value="All";
+  const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
+  applyData(kpis); ROI=buildROI();
+  document.getElementById("batch").textContent="Batch: Seed baseline";
+  markDirty(false);
+}
+function applyLive(){
+  const L=window.__LIVE; if(!L) return;
+  DATA.as_of=L.as_of;
+  RAW={universe:L.raw.universe.slice(),assessed:L.raw.assessed.slice(),roi:L.raw.roi.slice()};
+  if(L.rateCard){ Object.keys(RATE_CARD).forEach(k=>delete RATE_CARD[k]); Object.assign(RATE_CARD,L.rateCard); }
+  CITY="All"; document.getElementById("cityFilter").value="All";
+  const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
+  applyData(kpis); ROI=buildROI();
+  document.getElementById("batch").textContent="Batch: "+L.batch;
+  markDirty(true);
+}
+function applyVersion(ver, isSave){
+  DATA.as_of=ver.as_of;
+  RAW={universe:ver.raw.universe.slice(),assessed:ver.raw.assessed.slice(),roi:ver.raw.roi.slice()};
+  if(ver.rateCard){ Object.keys(RATE_CARD).forEach(k=>delete RATE_CARD[k]); Object.assign(RATE_CARD,ver.rateCard); rerenderRateEditor(); }
+  CITY="All"; document.getElementById("cityFilter").value="All";
+  const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
+  applyData(kpis); ROI=buildROI();
+  document.getElementById("batch").textContent="Batch: "+ver.batch;
+  markDirty(false);
+}
 
 /* ============ CITY FILTER ============ */
 let RAW={universe:[],assessed:[],roi:[]};      // current parsed pod-level data
@@ -795,6 +910,30 @@ function resetRateCard(){
   const ok=document.getElementById('rcApplied');
   if(ok){ ok.textContent='✓ Reset to defaults'; ok.style.display='inline'; setTimeout(()=>{ok.style.display='none'; ok.textContent='✓ Applied — ROI recalculated';},2500); }
 }
+// Re-render the rate-card editor <inputs> from the live RATE_CARD (used after a version swap)
+function rerenderRateEditor(){
+  const root=document.getElementById('rcEditor');
+  if(!root) return;
+  root.querySelectorAll('tbody tr').forEach(tr=>{
+    const city=tr.dataset.city; const rc=RATE_CARD[city]; if(!rc) return;
+    const modeSel=tr.querySelector('.rc-mode'); if(modeSel) modeSel.value=rc.mode;
+    const pk=tr.querySelector('.rc-perkwh'); if(pk) pk.value=rc.perKwh;
+    const fl=tr.querySelector('.rc-flat'); if(fl) fl.value=rc.flat;
+    const lm=tr.querySelector('.rc-limit'); if(lm) lm.value=(rc.limit===Infinity?0:rc.limit);
+  });
+}
+// Re-render the rate-card editor <inputs> from the live RATE_CARD (used after a version swap)
+function rerenderRateEditor(){
+  const root=document.getElementById('rcEditor');
+  if(!root) return;
+  root.querySelectorAll('tbody tr').forEach(tr=>{
+    const city=tr.dataset.city; const rc=RATE_CARD[city]; if(!rc) return;
+    const modeSel=tr.querySelector('.rc-mode'); if(modeSel) modeSel.value=rc.mode;
+    const pk=tr.querySelector('.rc-perkwh'); if(pk) pk.value=rc.perKwh;
+    const fl=tr.querySelector('.rc-flat'); if(fl) fl.value=rc.flat;
+    const lm=tr.querySelector('.rc-limit'); if(lm) lm.value=(rc.limit===Infinity?0:rc.limit);
+  });
+}
 
 function recompute(){
   const region=CITY;
@@ -809,6 +948,7 @@ function recompute(){
 RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice()};
 ROI=buildROI();   // build initial ROI cards from seeded data
 populateCities();
+refreshVersionDropdown("seed");
 document.getElementById("cityFilter").addEventListener("change",e=>{ CITY=e.target.value; recompute(); });
 
 /* ============ DRILL-THROUGH ============ */
