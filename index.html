@@ -938,7 +938,7 @@ function treeHTML(){
     else{n.children.forEach(c=>layout(c,level+1));n.xs=(n.children[0].xs+n.children[n.children.length-1].xs)/2;}
   }
   layout(TREE,0);
-  const nodeW=158,nodeH=82,xGap=14,yGap=48,pad=22;
+  const nodeW=138,nodeH=74,xGap=6,yGap=28,pad=16;
   const xPix=s=>pad+s*(nodeW+xGap);
   const yPix=l=>pad+l*(nodeH+yGap);
   const W=pad*2+numLeaves*(nodeW+xGap)-xGap;
