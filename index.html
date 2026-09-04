@@ -1056,19 +1056,15 @@ function renderT0(){
     <div class="lanes">
       <div class="lane space" onclick="openModal('No Space','blk_space')" style="cursor:pointer">
         <div class="h">No Space</div><div class="v">${blkSpace}</div><div class="d">Re-site / deprioritize</div>
-        ${blockerTodoHTML('blk_space')}
       </div>
       <div class="lane power" onclick="openModal('No Power','blk_power')" style="cursor:pointer">
         <div class="h">No Power</div><div class="v">${blkPower}</div><div class="d">Power enhancement / ROI</div>
-        ${blockerTodoHTML('blk_power')}
       </div>
       <div class="lane noc" onclick="openModal('No NOC','blk_noc')" style="cursor:pointer">
         <div class="h">No NOC</div><div class="v">${blkNoc}</div><div class="d">NOC acceleration</div>
-        ${blockerTodoHTML('blk_noc')}
       </div>
       <div class="lane vendor" onclick="openModal('Vendor not willing','blk_vendor')" style="cursor:pointer">
         <div class="h">Vendor not willing</div><div class="v">${blkVendor}</div><div class="d">Reassign vendor</div>
-        ${blockerTodoHTML('blk_vendor')}
       </div>
     </div>
     <div class="small muted" style="margin-top:8px">A pod with both space and power blocked appears in both buckets. Counts overlap and do not sum to total.</div>
