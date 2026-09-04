@@ -332,6 +332,10 @@ tbody tr:hover{background:#f8fafc}
         <option value="All">All</option>
         <option value="Top4">Top 4</option>
         <option value="Top7">Top 7</option>
+        <option value="NCR">NCR</option>
+        <option value="Bangalore">Bangalore</option>
+        <option value="Mumbai">Mumbai</option>
+        <option value="Hyderabad">Hyderabad</option>
       </select>
       <label class="btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px">
         ⬆ Upload .xlsx
@@ -804,16 +808,22 @@ let CITY="All";                                // selected region filter: All | 
 let ROI=[];                                    // ROI cards (rebuilt from RAW.roi by buildROI)
 const TOP4=["Delhi","Gurgaon","Noida","Mumbai","Bangalore","Hyderabad"];      // NCR=Delhi+Gurgaon+Noida
 const TOP7=[...TOP4,"Kolkata","Pune","Chennai"];
+const NCR=["Delhi","Gurgaon","Noida","Faridabad"];
+const REGIONS=["All","Top4","Top7","NCR","Bangalore","Mumbai","Hyderabad"];
 function normCityKey(c){ if(!c) return ""; const s=String(c).trim(); const m={gurugram:"Gurgaon","noida 1":"Noida",pune:"Pune",delhi:"Delhi",mumbai:"Mumbai",chennai:"Chennai",bangalore:"Bangalore",hyderabad:"Hyderabad",kolkata:"Kolkata",gurgaon:"Gurgaon",noida:"Noida",faridabad:"Faridabad"}; return m[s.toLowerCase()]||s; }
 function inRegion(p,region){
   if(region==="All") return true;
   const c=normCityKey(p.city);
-  return region==="Top4" ? TOP4.includes(c) : TOP7.includes(c);
+  if(region==="Top4") return TOP4.includes(c);
+  if(region==="Top7") return TOP7.includes(c);
+  if(region==="NCR") return NCR.includes(c);
+  // single-city filters (Bangalore, Mumbai, Hyderabad, …)
+  return c===region;
 }
 function populateCities(){
-  // options are static (All / Top 4 / Top 7); keep selection stable after upload
+  // options are static; keep selection stable after upload (reset to All if the saved value no longer exists)
   const sel=document.getElementById("cityFilter");
-  sel.value=["All","Top4","Top7"].includes(sel.value)?sel.value:"All";
+  sel.value=REGIONS.includes(sel.value)?sel.value:"All";
 }
 /* ============ ONE-TIME COST RATE CARD (city → load extension budget) ============ */
 // oneTimeCost applies the city rate card to the additional load (kWh) being added:
