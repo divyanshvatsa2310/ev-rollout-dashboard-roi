@@ -350,6 +350,22 @@ tbody tr:hover{background:#f8fafc}
 .vg-mo-count{font-size:9px;color:var(--muted);margin-top:2px}
 .vg-row-live{background:#f0fdf4;border-left:4px solid var(--green)}
 .vg-sub{font-size:9px;color:var(--muted);margin-top:2px}
+.vg-clickable{cursor:pointer;transition:background .12s}
+.vg-clickable:hover{background:#eff6ff !important}
+.vg-expand-hint{font-size:8px;color:#94a3b8;margin-top:2px;font-weight:400}
+.vg-expand{padding:8px 12px 12px;background:#f8fafc;border:1px solid var(--border);border-top:none}
+.vg-detail-table{border-collapse:collapse;font-size:11px;width:100%}
+.vg-detail-table th{background:#e2e8f0;color:#475569;font-weight:700;text-align:left;padding:4px 8px;font-size:10px;text-transform:uppercase}
+.vg-detail-table td{border:1px solid #e2e8f0;padding:4px 8px}
+.vg-detail-table tr:nth-child(even){background:#f1f5f9}
+.vg-clickable{cursor:pointer;transition:background .12s}
+.vg-clickable:hover{background:#eff6ff !important}
+.vg-expand-hint{font-size:8px;color:#94a3b8;margin-top:2px;font-weight:400}
+.vg-expand{padding:8px 12px 12px;background:#f8fafc;border:1px solid var(--border);border-top:none}
+.vg-detail-table{border-collapse:collapse;font-size:11px;width:100%}
+.vg-detail-table th{background:#e2e8f0;color:#475569;font-weight:700;text-align:left;padding:4px 8px;font-size:10px;text-transform:uppercase}
+.vg-detail-table td{border:1px solid #e2e8f0;padding:4px 8px}
+.vg-detail-table tr:nth-child(even){background:#f1f5f9}
 /* ===== VERTICAL GANTT (months as rows) ===== */
 .vg-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
 .vg-header{display:grid;grid-template-columns:120px 1fr 130px;background:#0b2545;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px}
@@ -1357,6 +1373,11 @@ function renderT0(){
 }
 
 /* ============ TAB 2: PROJECTIONS (Past vs Upcoming + Vendor Gantt) ============ */
+// Toggle expand/collapse of a month's pod-detail table
+function vgToggle(mk){
+  const el=document.getElementById('vgx-'+mk); if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
 function renderT1(){
   // Vertical Gantt — 'Already Live' baseline row, then months Jul'26→Mar'27 as rows
   const A=(RAW&&RAW.assessed)?RAW.assessed:[];
@@ -1423,11 +1444,12 @@ function renderT1(){
       <div class="vg-col-total"><span class="vg-cumul" style="color:var(--green)">${alreadyLive}</span></div>
     </div>
     ${rows.map(r=>`
-      <div class="vg-row ${r.total?'':'vg-row-empty'}">
-        <div class="vg-col-month"><div class="vg-mlabel">${mLabel(r.m)}</div></div>
+      <div class="vg-row ${r.total?'':'vg-row-empty'} vg-clickable" data-mk="${r.k}" onclick="vgToggle('${r.k}')">
+        <div class="vg-col-month"><div class="vg-mlabel">${mLabel(r.m)}</div>${r.total?'<div class="vg-expand-hint">▾ click to expand</div>':''}</div>
         <div class="vg-col-detail">${vChips(r.vendors)}</div>
         <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?'<div class="vg-mo-count">+${r.total} this mo</div>':''}</div>
-      </div>`).join('')}
+      </div>
+      ${r.total?`<div class="vg-expand" id="vgx-${r.k}" style="display:none"><table class="vg-detail-table"><thead><tr><th>Pod</th><th>City</th><th>Vendor</th><th>Go-live date</th></tr></thead><tbody>${dated.filter(p=>mKey(p.date)===r.k).map(p=>`<tr><td><b>${p.pod_name||p.pod_id}</b></td><td>${p.city||'—'}</td><td>${p.vendor}</td><td>${p.date.toISOString().slice(0,10)}</td></tr>`).join('')}</tbody></table></div>`:''}`).join('')}
   </div>
   <div class="small muted" style="margin-top:10px">${alreadyLive} already live + ${dated.length} with go-live dates (${mLabel(months[0])} → ${mLabel(months[months.length-1])}). Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
   </div>`;
