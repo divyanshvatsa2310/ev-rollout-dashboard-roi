@@ -348,6 +348,8 @@ tbody tr:hover{background:#f8fafc}
 .vg-col-total{text-align:right}
 .vg-cumul{font-size:22px;font-weight:800;color:var(--green);display:block;line-height:1}
 .vg-mo-count{font-size:9px;color:var(--muted);margin-top:2px}
+.vg-row-live{background:#f0fdf4;border-left:4px solid var(--green)}
+.vg-sub{font-size:9px;color:var(--muted);margin-top:2px}
 /* ===== VERTICAL GANTT (months as rows) ===== */
 .vg-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
 .vg-header{display:grid;grid-template-columns:120px 1fr 130px;background:#0b2545;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px}
@@ -1356,28 +1358,25 @@ function renderT0(){
 
 /* ============ TAB 2: PROJECTIONS (Past vs Upcoming + Vendor Gantt) ============ */
 function renderT1(){
-  // Vertical Gantt — months as rows, pods grouped by vendor, cumulative total on the right
+  // Vertical Gantt — 'Already Live' baseline row, then months Jul'26→Mar'27 as rows
   const A=(RAW&&RAW.assessed)?RAW.assessed:[];
-  // Convert Excel serial dates or ISO strings to a Date; return null if invalid
   const parseDate=(v)=>{ if(!v) return null; if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:d; } const dd=new Date(v); return isNaN(dd)?null:dd; };
-  // Each pod: pick the go-live date (actual if present, else target)
+
+  // Already-live stations (no go-live date, or actual_go_live before the window)
+  const alreadyLive=K.stationLive||0;
+
+  // Pods launching in each month (actual if present, else target)
   const dated=A.map(p=>{
     const ad=parseDate(p.actual_go_live), td=parseDate(p.target_go_live);
     const dt=ad||td; if(!dt) return null;
     return {pod_id:p.pod_id, pod_name:p.pod_name, city:p.city, vendor:(p.vendor||'TBD'), date:dt, kind: ad?'past':'upcoming'};
   }).filter(Boolean).sort((a,b)=>a.date-b.date);
 
-  if(!dated.length){
-    document.getElementById('t1').innerHTML=`<div class="card"><h3>Launch Projections <span class="sow">vertical Gantt — months as rows</span></h3>
-    <div class="gantt-empty"><b>No launch dates found in the Assessment sheet.</b><br>Enter <code>actual_go_live</code> (past) or <code>target_go_live</code> (upcoming) in the Assessment sheet, then re-upload.</div></div>`;
-    return;
-  }
-
   // Fixed window: July 2026 → March 2027 (9 months)
   const months=[];
-  for(let i=0;i<9;i++){ months.push(new Date(2026,6+i,1)); }   // month 6 = July (0-indexed)
+  for(let i=0;i<9;i++){ months.push(new Date(2026,6+i,1)); }
   const mKey=m=>`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-  const mLabel=m=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m.getMonth()]+' '+m.getFullYear();
+  const mLabel=m=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m.getMonth()]+' '+m.getFullYear().toString().slice(2);
 
   // Group pods by month → vendor → count
   const byMonth={};
@@ -1388,12 +1387,12 @@ function renderT1(){
   dated.forEach(p=>{ vendorTotals[p.vendor]=(vendorTotals[p.vendor]||0)+1; });
   const vendors=Object.keys(vendorTotals).sort((a,b)=>vendorTotals[b]-vendorTotals[a]);
 
-  // Vendor colors (cycle through a palette)
+  // Vendor colors
   const vColors=['#2563eb','#7c3aed','#db2777','#0891b2','#ea580c','#16a34a','#ca8a04','#9333ea'];
   const vColor=v=>vColors[vendors.indexOf(v)%vColors.length];
 
-  // Cumulative count through each month
-  let cumul=0;
+  // Cumulative count: starts from alreadyLive, then adds each month's launches
+  let cumul=alreadyLive;
   const rows=months.map((m,i)=>{
     const k=mKey(m); const mv=byMonth[k]||{};
     const monthPods=dated.filter(p=>mKey(p.date)===k);
@@ -1410,12 +1409,18 @@ function renderT1(){
     }).join('');
   };
 
-  document.getElementById('t1').innerHTML=`<div class="card"><h3>Launch Projections <span class="sow">vertical Gantt — months as rows · vendor bifurcation · cumulative open</span></h3>
+  document.getElementById('t1').innerHTML=`<div class="card"><h3>Launch Projections <span class="sow">vertical Gantt — already live baseline + monthly launches by vendor</span></h3>
   <div class="vg-wrap">
     <div class="vg-header">
       <div class="vg-col-month">Month</div>
       <div class="vg-col-detail">Stations opening (by vendor)</div>
-      <div class="vg-col-total">Open by month-end</div>
+      <div class="vg-col-total">Total open</div>
+    </div>
+    <!-- Already Live baseline row -->
+    <div class="vg-row vg-row-live">
+      <div class="vg-col-month"><div class="vg-mlabel" style="color:var(--green)">Already Live</div><div class="vg-sub">baseline before Jul '26</div></div>
+      <div class="vg-col-detail"><div class="vg-vendor" style="border-left:3px solid var(--green)"><span class="vg-vname">Live stations</span><span class="vg-count" style="background:var(--green)">${alreadyLive}</span></div></div>
+      <div class="vg-col-total"><span class="vg-cumul" style="color:var(--green)">${alreadyLive}</span></div>
     </div>
     ${rows.map(r=>`
       <div class="vg-row ${r.total?'':'vg-row-empty'}">
@@ -1424,10 +1429,11 @@ function renderT1(){
         <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?'<div class="vg-mo-count">+${r.total} this mo</div>':''}</div>
       </div>`).join('')}
   </div>
-  <div class="small muted" style="margin-top:10px">${dated.length} pod(s) with go-live dates · window ${mLabel(months[0])} → ${mLabel(months[months.length-1])}. Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
+  <div class="small muted" style="margin-top:10px">${alreadyLive} already live + ${dated.length} with go-live dates (${mLabel(months[0])} → ${mLabel(months[months.length-1])}). Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
   </div>`;
 }
 
+/* ============ TAB 3: NON-FEASIBLE + ROI ============
 /* ============ TAB 3: NON-FEASIBLE + ROI ============
 /* ============ TAB 3: NON-FEASIBLE + ROI ============ */
 /* ============ BLOCKER ACTION CASCADES (to-do per lane) ============ */
