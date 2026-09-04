@@ -127,12 +127,12 @@ tbody tr:hover{background:#f8fafc}
 .tree-wrap svg{display:block}
 .tlink{fill:none;stroke:#cbd5e1;stroke-width:2}
 .tlink-act{stroke:#94a3b8}
-.snode{width:100%;height:100%;border:2px solid;border-radius:10px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px 4px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
-.snode .tname{font-size:10px;font-weight:700;color:var(--navy);line-height:1.1;max-width:100%;word-break:break-word}
-.snode .tsub2{font-size:8px;color:var(--muted);font-weight:500;line-height:1.05;margin-top:1px}
-.snode .tcount{font-size:18px;font-weight:700;color:var(--navy);margin:1px 0 0}
-.snode .tconv{font-size:8px;color:var(--muted);line-height:1.05}
-.snode .taction{font-size:8px;font-weight:700;margin-top:2px;padding:1px 6px;border-radius:10px;line-height:1.25;white-space:nowrap}
+.snode{width:100%;height:100%;border:2px solid;border-radius:7px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2px 3px;box-shadow:0 1px 2px rgba(0,0,0,.06);overflow:hidden}
+.snode .tname{font-size:8px;font-weight:700;color:var(--navy);line-height:1.05;max-width:100%;word-break:break-word}
+.snode .tsub2{font-size:7px;color:var(--muted);font-weight:500;line-height:1;margin-top:1px}
+.snode .tcount{font-size:14px;font-weight:700;color:var(--navy);margin:0}
+.snode .tconv{font-size:7px;color:var(--muted);line-height:1}
+.snode .taction{font-size:7px;font-weight:700;margin-top:1px;padding:0 4px;border-radius:8px;line-height:1.15;white-space:nowrap}
 .snode.root{border-color:var(--navy);background:linear-gradient(135deg,#0b2545,#13315c);color:#fff}
 .snode.root .tname{color:#fff}.snode.root .tcount{color:#fff}.snode.root .tconv{color:rgba(255,255,255,.7)}
 .snode.assessed{border-color:var(--blue);background:#eff6ff}
@@ -938,7 +938,7 @@ function treeHTML(){
     else{n.children.forEach(c=>layout(c,level+1));n.xs=(n.children[0].xs+n.children[n.children.length-1].xs)/2;}
   }
   layout(TREE,0);
-  const nodeW=132,nodeH=70,xGap=4,yGap=24,pad=14;
+  const nodeW=104,nodeH=54,xGap=2,yGap=12,pad=10;
   const xPix=s=>pad+s*(nodeW+xGap);
   const yPix=l=>pad+l*(nodeH+yGap);
   const W=pad*2+numLeaves*(nodeW+xGap)-xGap;
