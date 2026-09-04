@@ -1069,31 +1069,7 @@ function renderT0(){
     </div>
     <div class="small muted" style="margin-top:8px">A pod with both space and power blocked appears in both buckets. Counts overlap and do not sum to total.</div>
   </div>
-  <div class="card"><h3>Funnel — Decision Tree <span class="sow">each leaf = an action someone owns · scroll horizontally if needed</span></h3>${treeHTML()}</div>
-  <div class="card"><h3>Tree Summary <span class="sow">branch counts and conversion</span></h3>
-    <table><thead><tr><th>Branch</th><th>Pods</th><th>% of Parent</th><th>Next Action</th><th>Owner</th></tr></thead>
-    <tbody>
-      <tr><td><b>Total Pods</b></td><td>${K.total}</td><td>—</td><td>—</td><td>—</td></tr>
-      <tr><td style="padding-left:16px">├ Evaluated</td><td>${K.evaluated}</td><td>${pct(K.evaluated,K.total)}</td><td>—</td><td>—</td></tr>
-      <tr><td style="padding-left:32px">├─ Feasible (space ✓ + power ✓)</td><td>${K.feasible}</td><td>${pct(K.feasible,K.evaluated)}</td><td>—</td><td>—</td></tr>
-      <tr><td style="padding-left:48px">├── NOC Approved</td><td>${K.nocApproved}</td><td>${pct(K.nocApproved,K.feasible)}</td><td>—</td><td>—</td></tr>
-      <tr><td style="padding-left:64px">├─── Vendor Ready → <b>Final Rollout</b></td><td><span class="pos">${K.vendorReady}</span></td><td>${pct(K.vendorReady,K.nocApproved)}</td><td>Complete rollout</td><td>Ops</td></tr>
-      <tr><td style="padding-left:64px">├─── Vendor Blocked</td><td>${K.vendorBlocked}</td><td>${pct(K.vendorBlocked,K.nocApproved)}</td><td>Reassign vendor</td><td>Vendor Mgmt</td></tr>
-      <tr><td style="padding-left:48px">├── NOC No / WIP</td><td>${K.nocNo} / ${K.nocWip}</td><td>${pct(K.nocNo+K.nocWip,K.feasible)}</td><td>NOC acceleration</td><td>RE Team</td></tr>
-      <tr><td style="padding-left:32px">├─ Not Feasible</td><td>${K.notFeasEval}</td><td>${pct(K.notFeasEval,K.evaluated)}</td><td>—</td><td>—</td></tr>
-      <tr><td style="padding-left:48px">├── Space Blocked</td><td>${K.nfSpace}</td><td>—</td><td>Re-site / deprioritize</td><td>Ops</td></tr>
-      <tr><td style="padding-left:48px">├── Power Blocked</td><td>${K.nfPower}</td><td>—</td><td>—</td><td>—</td></tr>
-      <tr><td style="padding-left:64px">├─── + Vendor Interest → <b>ROI Calc</b></td><td>${K.nfPowerV}</td><td>—</td><td>Run ROI → enhance / operate / reject</td><td>City Leads</td></tr>
-      <tr><td style="padding-left:64px">├─── No Vendor</td><td>${K.nfPowerNV}</td><td>—</td><td>Source vendor</td><td>Vendor Mgmt</td></tr>
-      <tr><td style="padding-left:48px">├── Both Blocked</td><td>${K.nfBoth}</td><td>—</td><td>Deprioritize</td><td>Ops</td></tr>
-      <tr><td style="padding-left:16px">├ Under Evaluation</td><td>${K.underEval}</td><td>${pct(K.underEval,K.total)}</td><td>Await RE check</td><td>RE Team</td></tr>
-      <tr><td style="padding-left:16px">└ Not Evaluated</td><td>${K.total-K.evaluated-K.underEval}</td><td>${pct(K.total-K.evaluated-K.underEval,K.total)}</td><td>Complete assessment</td><td>Ops</td></tr>
-    </tbody></table>
-  </div>
-  <div class="card"><h3>Pod Detail <span class="sow">drill-through</span></h3>
-    <div class="scroll"><table><thead><tr><th>Pod</th><th>City</th><th>Status</th><th>Store</th><th>Usage</th><th>Sanctioned</th><th>EV need</th><th>Total</th><th>Enh.</th><th>NOC</th><th>Vendor</th><th>Rollout</th></tr></thead>
-    <tbody>${PODS.map(p=>`<tr><td><b>${p.pod_id}</b><br><span class="muted small">${p.pod_name}</span></td><td>${p.city}</td><td>${badge(p.elec_status)}</td><td>${p.store_status==='live'?'<span class="pos">live</span>':'<span style="color:#2563eb">upcoming</span>'}</td><td>${p.current_usage_kwh}</td><td>${p.current_sanctioned_load_kwh}</td><td>${p.ev_load_required_kwh}</td><td>${p.planned_total_load_kwh}</td><td>${p.enhancement_kwh||'—'}</td><td>${p.noc}</td><td>${p.vendor}</td><td>${badge(p.rollout_status)}</td></tr>`).join('')}</tbody></table></div>
-  </div>`;
+  <div class="card"><h3>Funnel — Decision Tree <span class="sow">each leaf = an action someone owns · scroll horizontally if needed</span></h3>${treeHTML()}</div>`;
 }
 
 /* ============ TAB 2: PROJECTIONS (Past vs Upcoming + Vendor Gantt) ============ */
