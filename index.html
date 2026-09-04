@@ -330,6 +330,42 @@ tbody tr:hover{background:#f8fafc}
 .gantt-table .vchip{font-size:10px;font-weight:700;color:#fff;background:#8b5cf6;padding:1px 7px;border-radius:10px}
 .gantt-table .vempty{font-size:10px;color:var(--muted);border:1px dashed var(--border);padding:1px 6px;border-radius:10px}
 .gantt-legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+/* ===== VERTICAL GANTT (months as rows) ===== */
+.vg-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
+.vg-header{display:grid;grid-template-columns:120px 1fr 130px;background:#0b2545;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px}
+.vg-row{display:grid;grid-template-columns:120px 1fr 130px;border-top:1px solid var(--border);padding:8px 12px;align-items:flex-start}
+.vg-row-empty{background:#fafbfc}
+.vg-row:nth-child(even){background:#f8fafc}
+.vg-col-month{font-weight:700;color:var(--navy)}
+.vg-mlabel{font-size:12px}
+.vg-col-detail{display:flex;flex-direction:column;gap:4px;padding:0 8px}
+.vg-vendor{padding:4px 8px;background:#f1f5f9;border-radius:6px;font-size:11px}
+.vg-vname{font-weight:700;color:var(--navy);margin-right:6px}
+.vg-count{font-size:10px;font-weight:700;color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px}
+.vg-pods{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4}
+.vg-pods span{color:#475569}
+.vg-empty{color:#cbd5e1;font-size:12px;padding:4px 0}
+.vg-col-total{text-align:right}
+.vg-cumul{font-size:22px;font-weight:800;color:var(--green);display:block;line-height:1}
+.vg-mo-count{font-size:9px;color:var(--muted);margin-top:2px}
+/* ===== VERTICAL GANTT (months as rows) ===== */
+.vg-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:6px}
+.vg-header{display:grid;grid-template-columns:120px 1fr 130px;background:#0b2545;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px}
+.vg-row{display:grid;grid-template-columns:120px 1fr 130px;border-top:1px solid var(--border);padding:8px 12px;align-items:flex-start}
+.vg-row-empty{background:#fafbfc}
+.vg-row:nth-child(even){background:#f8fafc}
+.vg-col-month{font-weight:700;color:var(--navy)}
+.vg-mlabel{font-size:12px}
+.vg-col-detail{display:flex;flex-direction:column;gap:4px;padding:0 8px}
+.vg-vendor{padding:4px 8px;background:#f1f5f9;border-radius:6px;font-size:11px}
+.vg-vname{font-weight:700;color:var(--navy);margin-right:6px}
+.vg-count{font-size:10px;font-weight:700;color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px}
+.vg-pods{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4}
+.vg-pods span{color:#475569}
+.vg-empty{color:#cbd5e1;font-size:12px;padding:4px 0}
+.vg-col-total{text-align:right}
+.vg-cumul{font-size:22px;font-weight:800;color:var(--green);display:block;line-height:1}
+.vg-mo-count{font-size:9px;color:var(--muted);margin-top:2px}
 .gantt-empty{padding:28px 18px;text-align:center;color:var(--muted)}
 .gantt-empty b{color:var(--navy)}
 @media(max-width:780px){.past-vs-up{grid-template-columns:1fr}}
@@ -1320,90 +1356,80 @@ function renderT0(){
 
 /* ============ TAB 2: PROJECTIONS (Past vs Upcoming + Vendor Gantt) ============ */
 function renderT1(){
-  // Per-pod launch data from the Assessment sheet (actual_go_live = past, target_go_live = upcoming)
+  // Vertical Gantt — months as rows, pods grouped by vendor, cumulative total on the right
   const A=(RAW&&RAW.assessed)?RAW.assessed:[];
-  const past=A.filter(p=>p.actual_go_live).sort((a,b)=>String(a.actual_go_live).localeCompare(String(b.actual_go_live)));
-  const upc =A.filter(p=>!p.actual_go_live && p.target_go_live).sort((a,b)=>String(a.target_go_live).localeCompare(String(b.target_go_live)));
-  const hasDates = past.length>0 || upc.length>0;
+  // Convert Excel serial dates or ISO strings to a Date; return null if invalid
+  const parseDate=(v)=>{ if(!v) return null; if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d)?null:d; } const dd=new Date(v); return isNaN(dd)?null:dd; };
+  // Each pod: pick the go-live date (actual if present, else target)
+  const dated=A.map(p=>{
+    const ad=parseDate(p.actual_go_live), td=parseDate(p.target_go_live);
+    const dt=ad||td; if(!dt) return null;
+    return {pod_id:p.pod_id, pod_name:p.pod_name, city:p.city, vendor:(p.vendor||'TBD'), date:dt, kind: ad?'past':'upcoming'};
+  }).filter(Boolean).sort((a,b)=>a.date-b.date);
 
-  // Build a 12-month window ending 6 months ahead for the combined timeline + gantt
-  const dNow=new Date(); dNow.setDate(1);
+  if(!dated.length){
+    document.getElementById('t1').innerHTML=`<div class="card"><h3>Launch Projections <span class="sow">vertical Gantt — months as rows</span></h3>
+    <div class="gantt-empty"><b>No launch dates found in the Assessment sheet.</b><br>Enter <code>actual_go_live</code> (past) or <code>target_go_live</code> (upcoming) in the Assessment sheet, then re-upload.</div></div>`;
+    return;
+  }
+
+  // Build a 12-month forward window from the as-of date
+  const asOf=new Date(DATA.as_of); asOf.setDate(1);
   const months=[];
-  for(let i=-5;i<=6;i++){ const m=new Date(dNow.getFullYear(),dNow.getMonth()+i,1); months.push(m); }
+  for(let i=0;i<12;i++){ months.push(new Date(asOf.getFullYear(),asOf.getMonth()+i,1)); }
   const mKey=m=>`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-  const mLabel=m=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m.getMonth()]+" '"+String(m.getFullYear()).slice(2);
+  const mLabel=m=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m.getMonth()]+' '+m.getFullYear();
 
-  // Monthly counts: past (actual) and upcoming (target)
-  const pastM={}, upcM={};
-  past.forEach(p=>{ const k=(String(p.actual_go_live).slice(0,7)); pastM[k]=(pastM[k]||0)+1; });
-  upc.forEach(p=>{ const k=(String(p.target_go_live).slice(0,7)); upcM[k]=(upcM[k]||0)+1; });
-  const maxM=Math.max(1,...months.map(m=>Math.max(pastM[mKey(m)]||0,upcM[mKey(m)]||0)));
-  const nowKey=mKey(dNow), nowIdx=months.findIndex(m=>mKey(m)===nowKey);
+  // Group pods by month → vendor → count
+  const byMonth={};
+  dated.forEach(p=>{ const k=mKey(p.date); if(!byMonth[k]) byMonth[k]={}; const v=p.vendor; if(!byMonth[k][v]) byMonth[k][v]=[]; byMonth[k][v].push(p); });
 
-  // Gantt: pods with dates, last 6 → next 6 months on the timeline
-  const gantt=[...past.map(p=>({...p,date:p.actual_go_live,kind:'past'})),
-               ...upc.map(p=>({...p,date:p.target_go_live,kind:'upcoming'}))]
-              .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  const span=months.length;
+  // Distinct vendors (sorted by total count desc)
+  const vendorTotals={};
+  dated.forEach(p=>{ vendorTotals[p.vendor]=(vendorTotals[p.vendor]||0)+1; });
+  const vendors=Object.keys(vendorTotals).sort((a,b)=>vendorTotals[b]-vendorTotals[a]);
 
-  document.getElementById('t1').innerHTML=`
-  <div class="card"><h3>Launch Projections <span class="sow">past (actual) vs upcoming (target) — from Assessment go-live dates</span></h3>
-    ${ hasDates ? `
-    <!-- PAST vs UPCOMING overview -->
-    <div class="past-vs-up">
-      <div class="pu-card past">
-        <h4>Past Launches (actual go-live)</h4>
-        <div class="big">${past.length}</div>
-        <div class="small muted">pods already live</div>
-        <div class="pu-mini">${months.slice(6).map(m=>{const k=mKey(m);const v=pastM[k]||0;return `<div class="b ${v?'':'empty'}" style="height:${v?Math.max(8,v/maxM*46):4}px" title="${k}: ${v}"></div>`}).join('')}</div>
-        <div class="pu-list">${past.length?past.slice(0,40).map(p=>`<div class="pu-row"><span class="nm">${p.pod_name||p.pod_id||'—'}</span><span class="dt">${p.actual_go_live||'—'}${p.vendor?`<span class="vchip">${p.vendor}</span>`:''}</span></div>`).join(''):'<div class="pu-row"><span class="muted">No pods with actual_go_live yet</span></div>'}</div>
-        ${past.length>40?`<div class="small muted" style="margin-top:6px">+${past.length-40} more…</div>`:''}
-      </div>
-      <div class="pu-card upc">
-        <h4>Upcoming Launches (target go-live)</h4>
-        <div class="big">${upc.length}</div>
-        <div class="small muted">pods planned to open</div>
-        <div class="pu-mini">${months.slice(6).map(m=>{const k=mKey(m);const v=upcM[k]||0;return `<div class="b ${v?'':'empty'}" style="height:${v?Math.max(8,v/maxM*46):4}px" title="${k}: ${v}"></div>`}).join('')}</div>
-        <div class="pu-list">${upc.length?upc.slice(0,40).map(p=>`<div class="pu-row"><span class="nm">${p.pod_name||p.pod_id||'—'}</span><span class="dt">${p.target_go_live||'—'}${p.vendor?`<span class="vchip">${p.vendor}</span>`:'<span class="vempty">TBD</span>'}</span></div>`).join(''):'<div class="pu-row"><span class="muted">No pods with target_go_live yet</span></div>'}</div>
-        ${upc.length>40?`<div class="small muted" style="margin-top:6px">+${upc.length-40} more…</div>`:''}
-      </div>
+  // Vendor colors (cycle through a palette)
+  const vColors=['#2563eb','#7c3aed','#db2777','#0891b2','#ea580c','#16a34a','#ca8a04','#9333ea'];
+  const vColor=v=>vColors[vendors.indexOf(v)%vColors.length];
+
+  // Cumulative count through each month
+  let cumul=0;
+  const rows=months.map((m,i)=>{
+    const k=mKey(m); const mv=byMonth[k]||{};
+    const monthPods=dated.filter(p=>mKey(p.date)===k);
+    cumul+=monthPods.length;
+    return {m, k, vendors:mv, total:monthPods.length, cumul};
+  });
+
+  // Build vendor chips per month
+  const vChips=(mv)=>{
+    if(!mv || Object.keys(mv).length===0) return '<span class="vg-empty">—</span>';
+    return vendors.filter(v=>mv[v]).map(v=>{
+      const pods=mv[v];
+      return `<div class="vg-vendor" style="border-left:3px solid ${vColor(v)}"><span class="vg-vname">${v}</span><span class="vg-count">${pods.length}</span><div class="vg-pods">${pods.slice(0,6).map(p=>`<span title="${p.pod_name} · ${p.city}">${p.pod_name||p.pod_id}</span>`).join(' · ')}${pods.length>6?' +'+(pods.length-6)+' more':''}</div></div>`;
+    }).join('');
+  };
+
+  document.getElementById('t1').innerHTML=`<div class="card"><h3>Launch Projections <span class="sow">vertical Gantt — months as rows · vendor bifurcation · cumulative open</span></h3>
+  <div class="vg-wrap">
+    <div class="vg-header">
+      <div class="vg-col-month">Month</div>
+      <div class="vg-col-detail">Stations opening (by vendor)</div>
+      <div class="vg-col-total">Open by month-end</div>
     </div>
-
-    <!-- Combined monthly timeline -->
-    <div class="timeline-leg"><span><i style="background:var(--green)"></i>Past launches</span><span><i style="background:#2563eb"></i>Upcoming launches</span><span><i style="background:#dc2626;width:3px;height:14px"></i>Current month</span></div>
-    <div class="comb-tl">
-      <div class="mcol">${months.map((m,i)=>{const k=mKey(m);const p=pastM[k]||0,u=upcM[k]||0;return `<div class="b ${p?'past':''}" style="height:${p?p/maxM*56:0}px" title="${k} past: ${p}"></div><div class="b ${u?'upc':''}" style="height:${u?u/maxM*56:0}px" title="${k} upcoming: ${u}"></div>`}).join('')}</div>
-      <div style="display:grid;grid-template-columns:repeat(${span},1fr)"><div class="mcol" style="height:auto"><div class="mlbl">${months.map(m=>mLabel(m)).join('</div></div><div class="mcol" style="height:auto"><div class="mlbl">')}</div></div></div>
-      ${ nowIdx>=0 ? `<div style="position:relative;height:2px"><div style="position:absolute;left:${(nowIdx+0.5)/span*100}%;top:-58px;width:2px;height:60px;background:#dc2626"></div><div style="position:absolute;left:${(nowIdx+0.5)/span*100}%;transform:translateX(-50%);top:-66px;font-size:8px;color:#dc2626;font-weight:700">now</div></div>`:'' }
-    </div>
-
-    <!-- Vendor Gantt chart -->
-    <h4 style="margin:18px 0 4px;font-size:13px;color:var(--navy)">Vendor Gantt — per-pod timeline</h4>
-    <div class="timeline-leg"><span><i style="background:var(--green)"></i>Past (actual)</span><span><i style="background:#2563eb"></i>Upcoming (target)</span><span><i style="background:#8b5cf6;border-radius:6px"></i>Vendor assigned</span><span style="color:var(--muted)">Blank vendor = TBD (fill in Assessment sheet)</span></div>
-    <div class="gantt-wrap">
-      <table class="gantt-table">
-        <thead><tr><th>Pod</th><th>City</th><th>Status</th><th>Vendor</th><th>Date</th><th class="tl-cell">Timeline (${mLabel(months[0])} → ${mLabel(months[months.length-1])})</th></tr></thead>
-        <tbody>
-        ${ gantt.length ? gantt.map(p=>{
-          const k=String(p.date).slice(0,7); const idx=months.findIndex(m=>mKey(m)===k);
-          let barPos=-1;
-          if(idx>=0){ barPos=(idx+0.5)/span*100; }
-          const pctStr = barPos>=0 ? `left:${Math.max(0,barPos-6)}%;width:12%` : `left:0;width:0`;
-          const vchip = p.vendor ? `<span class="vchip">${p.vendor}</span>` : `<span class="vempty">TBD</span>`;
-          const st = p.kind==='past' ? '<span class="pos">past</span>' : '<span style="color:#2563eb">upcoming</span>';
-          const barCls = p.kind==='past'?'past':'upcoming';
-          return `<tr><td><b>${p.pod_id||'—'}</b><br><span class="muted small">${(p.pod_name||'').slice(0,24)}</span></td><td>${p.city||'—'}</td><td>${st}</td><td>${vchip}</td><td>${p.date||'—'}</td><td class="tl-cell"><div class="tl-grid">${months.map(()=>'<div class="div"></div>').join('')}</div>${idx>=0?`<div class="gantt-bar ${barCls}" style="${pctStr}" title="${p.pod_name||p.pod_id} · ${p.date}">${p.vendor||p.kind}</div>`:'<span class="muted small">outside window</span>'}</td></tr>`;
-        }).join('') : `<tr><td colspan="6" class="gantt-empty"><b>No launch dates found.</b><br>Enter <code>actual_go_live</code> (past) or <code>target_go_live</code> (upcoming) in the Assessment sheet, then re-upload. Vendor names in the <code>vendor</code> column will appear as purple chips.</td></tr>` }
-        </tbody>
-      </table>
-    </div>
-    <div class="small muted" style="margin-top:8px">Showing ${gantt.length} pod(s) with dates · ${past.length} past · ${upc.length} upcoming. Timeline window: ${mLabel(months[0])} → ${mLabel(months[months.length-1])}.</div>
-    ` : `
-    <div class="gantt-empty"><b>No launch dates found in the Assessment sheet.</b><br>To populate this view:<br>1. Enter <code>actual_go_live</code> for completed EV launches (shown as green).<br>2. Enter <code>target_go_live</code> for planned launches (shown as blue).<br>3. Enter the vendor name in the Assessment sheet's <code>vendor</code> column (shown as a purple chip).<br>4. Re-upload the workbook.</div>
-    `}
+    ${rows.map(r=>`
+      <div class="vg-row ${r.total?'':'vg-row-empty'}">
+        <div class="vg-col-month"><div class="vg-mlabel">${mLabel(r.m)}</div></div>
+        <div class="vg-col-detail">${vChips(r.vendors)}</div>
+        <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?'<div class="vg-mo-count">+${r.total} this mo</div>':''}</div>
+      </div>`).join('')}
+  </div>
+  <div class="small muted" style="margin-top:10px">${dated.length} pod(s) with go-live dates across the next 12 months from ${mLabel(months[0])}. Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
   </div>`;
 }
 
+/* ============ TAB 3: NON-FEASIBLE + ROI ============
 /* ============ TAB 3: NON-FEASIBLE + ROI ============ */
 /* ============ BLOCKER ACTION CASCADES (to-do per lane) ============ */
 // Renders the ordered decision tree each blocker should walk through.
