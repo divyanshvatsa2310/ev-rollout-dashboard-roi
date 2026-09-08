@@ -609,7 +609,10 @@ function computeKPIs(universe,assessed,roi){
   // Rejected by Yuma = landlord approved (NOC=Yes) but vendor declined (notes: "Rejected by Vendor")
   const rejectedYuma=assessed.filter(p=>p.noc_status==="Yes"&&p.notes&&/rejected by vendor/i.test(String(p.notes))).length;
   // "Yet to start" (updated rule): WIP-path pods (NOC yes, not denied, not EV-live) with no target or a target 30+ days out
-  const yetToStart=assessed.filter(p=>nocOkNotLive(p)&&(!p.target_go_live||(()=>{const dd=daysAsOf(p.target_go_live);return dd===null||dd>30;})())).length;
+  const ytsPods=assessed.filter(p=>nocOkNotLive(p)&&(!p.target_go_live||(()=>{const dd=daysAsOf(p.target_go_live);return dd===null||dd>30;})()));
+  const yetToStart=ytsPods.length;
+  const ytsLive=ytsPods.filter(p=>p.store_status==="live").length;
+  const ytsUpc=ytsPods.filter(p=>p.store_status==="upcoming_live").length;
   const outOfScope=spaceOnly+bothBlocked;
   // "Only Power" = ALL power=Yes pods (irrespective of space); sub-counts by SPACE status: Yes(center) / No(left) / WIP(right)
   const onlyPowerTotal=assessed.filter(p=>p.power_available==="Y").length;
@@ -636,7 +639,7 @@ function computeKPIs(universe,assessed,roi){
     ev_live:evLive, upcoming_30:upcoming30, upcoming_30_live:upc30Live, upcoming_30_upc:upc30Upc, upcoming_30_live:upc30Live, upcoming_30_upc:upc30Upc,
     upcoming_all:upcomingAll, upcoming_all_live:upcomingAllLive, upcoming_all_upc:upcomingAllUpc,
     upcoming_all:upcomingAll, upcoming_all_live:upcomingAllLive, upcoming_all_upc:upcomingAllUpc,
-    rejected_yuma:rejectedYuma, yet_to_start:yetToStart, out_of_scope:outOfScope, power_blocked_roi:roi.length,
+    rejected_yuma:rejectedYuma, yet_to_start:yetToStart, yet_to_start_live:ytsLive, yet_to_start_upc:ytsUpc, out_of_scope:outOfScope, power_blocked_roi:roi.length,
     splits:{total:{l:liveU,u:upcU},assessed:splitA(p=>true),feasible:splitA(p=>p.feasible),
       noc_yes:splitA(p=>p.noc_status==="Yes"),ev_live:splitA(p=>p.ev_live)}
   };
@@ -786,7 +789,7 @@ function applyData(newData){
   K.upcomingAll=DATA.upcoming_all||0; K.upcomingAllSplit={l:DATA.upcoming_all_live||0,u:DATA.upcoming_all_upc||0};
   K.upcomingAll=DATA.upcoming_all||0; K.upcomingAllSplit={l:DATA.upcoming_all_live||0,u:DATA.upcoming_all_upc||0};
   K.upc30Split={l:DATA.upcoming_30_live,u:DATA.upcoming_30_upc};
-  K.rejectedYuma=DATA.rejected_yuma; K.yetToStart=DATA.yet_to_start;
+  K.rejectedYuma=DATA.rejected_yuma; K.yetToStart=DATA.yet_to_start; K.yetToStartSplit={l:DATA.yet_to_start_live||0,u:DATA.yet_to_start_upc||0};
   K.coverage=DATA.total?(DATA.ev_live/DATA.total*100).toFixed(0):0;
   K.covGap=DATA.total-DATA.ev_live;
   K.sTotal=DATA.splits.total; K.sAssessed=DATA.splits.assessed;
@@ -1402,6 +1405,10 @@ function overviewHTML(){
       </div>
       <div class="kpi-cell thoda-cell" onclick="openModal('Yet to start (no target or >30 days out)','yetToStart')">
         <div class="clbl">Yet to start</div><div class="cnum">${K.yetToStart}</div>
+        <div class="csplit" style="display:flex;flex-direction:column;gap:1px;line-height:1.3">
+          <span><span class="cl">● ${K.yetToStartSplit.l}</span> <span class="sep">at live pods</span></span>
+          <span><span class="cu">● ${K.yetToStartSplit.u}</span> <span class="sep">at upcoming pods</span></span>
+        </div>
       </div>
     </div>
   </div>`;
@@ -1601,7 +1608,7 @@ const K = {
   onlyPowerYes: DATA.only_power_yes, onlyPowerWip: DATA.only_power_wip, onlyPowerNo: DATA.only_power_no, onlyPowerTotal: DATA.only_power_total,
   onlySpaceYes: DATA.only_space_yes, onlySpaceWip: DATA.only_space_wip, onlySpaceNo: DATA.only_space_no, onlySpaceTotal: DATA.only_space_total,
   upcoming30: DATA.upcoming_30, liveNow: DATA.ev_live,
-  rejectedYuma: DATA.rejected_yuma, yetToStart: DATA.yet_to_start,
+  rejectedYuma: DATA.rejected_yuma, yetToStart: DATA.yet_to_start, yetToStartSplit: {l: DATA.yet_to_start_live||0, u: DATA.yet_to_start_upc||0},
   coverage: DATA.total ? (DATA.ev_live / DATA.total * 100).toFixed(0) : 0,
   covGap: DATA.total - DATA.ev_live,
   sTotal: DATA.splits.total, sAssessed: DATA.splits.assessed,
