@@ -440,7 +440,7 @@ tbody tr:hover{background:#f8fafc}
 <script>
 /* ============ DATA (from upload) ============ */
 const DATA = {
-  as_of: "2025-09-04",
+  as_of: todayISO(),
   total: 1227, live_universe: 1214, upcoming_universe: 13,
   assessed: 801, not_assessed: 426, evaluated: 346, under_eval: 187,
   feasible: 156, not_feas_eval: 190, space_only: 70, power_only: 37,
@@ -885,7 +885,7 @@ document.getElementById("asof").addEventListener("change",function(e){
   if(v) applyVersion(v, false);
 });
 function applySeed(){
-  DATA.as_of="2025-09-04";
+  DATA.as_of=todayISO();
   RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()};
   rebuildYulu();
   resetRateCard();
@@ -1368,11 +1368,17 @@ function overviewHTML(){
     <div class="kpi-matrix">
       <div class="kpi-cell live-cell" onclick="openModal('EV Live','liveEv')">
         <div class="clbl">Live</div><div class="cnum">${K.liveNow}</div>
-        <div class="csplit"><span class="cl">${K.liveSplit.l}</span><span class="sep">/</span><span class="cu">${K.liveSplit.u}</span></div>
+        <div class="csplit" style="display:flex;flex-direction:column;gap:1px;line-height:1.3">
+          <span><span class="cl">● ${K.liveSplit.l}</span> <span class="sep">at live pods</span></span>
+          <span><span class="cu">● ${K.liveSplit.u}</span> <span class="sep">at upcoming pods</span></span>
+        </div>
       </div>
       <div class="kpi-cell upc-cell" onclick="openModal('Upcoming (target go-live set)','upcomingAll')">
         <div class="clbl">Upcoming</div><div class="cnum">${K.upcomingAll}</div>
-        <div class="csplit"><span class="cl">${K.upcomingAllSplit.l}</span><span class="sep">/</span><span class="cu">${K.upcomingAllSplit.u}</span></div>
+        <div class="csplit" style="display:flex;flex-direction:column;gap:1px;line-height:1.3">
+          <span><span class="cl">● ${K.upcomingAllSplit.l}</span> <span class="sep">at live pods</span></span>
+          <span><span class="cu">● ${K.upcomingAllSplit.u}</span> <span class="sep">at upcoming pods</span></span>
+        </div>
       </div>
       <div class="kpi-cell rej-cell" onclick="openModal('Rejected by Yuma','rejectedYuma')">
         <div class="clbl">Rejected by Yuma</div><div class="cnum">${K.rejectedYuma}</div>
