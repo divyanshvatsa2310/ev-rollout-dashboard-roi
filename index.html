@@ -1236,9 +1236,14 @@ function treeHTML(){
   const deniedP=nlP.filter(p=>/rejected by vendor/i.test(String(p.notes||"")));
   const nlRest=nlP.filter(p=>!/rejected by vendor/i.test(String(p.notes||"")));
   const asOfDate=new Date(DATA.as_of);
-  const wip30P=nlRest.filter(p=>p.target_go_live&&within30(p.target_go_live,asOfDate))
-                     .concat(nlRest.filter(p=>{if(!p.target_go_live) return false; const dd=daysFrom(p.target_go_live,asOfDate); return dd!==null&&dd<0;}));
-  const wip30plusP=nlRest.filter(p=>isYetToStartAsOf(p,asOfDate));
+  // WIP = not-live live-stores + upcoming (new) pods — both split by target timing vs as-of
+  const wipAllP=[...nlRest, ...nocYesUpc];
+  const to30=(p)=>{ if(!p.target_go_live) return false; const dd=daysFrom(p.target_go_live,asOfDate); return dd!==null && dd<=30; };   // within 30d OR overdue
+  const wip30P=wipAllP.filter(to30);
+  const wip30plusP=wipAllP.filter(p=>!to30(p));   // no target or 30+ days out
+  const liveWip=nlRest.length, newWip=nocYesUpc.length;
+  const liveU30=nlRest.filter(to30).length, newU30=nocYesUpc.filter(to30).length;
+  const liveO30=liveWip-liveU30, newO30=newWip-newU30;
   const underEvalP=a.filter(p=>pending(p.space_available)||pending(p.power_available));
   const notEvalP=a.filter(p=>!(known(p.space_available)&&known(p.power_available)) && !(pending(p.space_available)||pending(p.power_available)));
   const spaceP=nfP.filter(p=>p.space_available==="N"&&p.power_available==="Y");
@@ -1255,11 +1260,10 @@ function treeHTML(){
           {id:'noc_ok',name:'NOC Approved',count:K.nocApproved,sub:pct(K.nocApproved,K.feasible)+' of feas',type:'noc',pods:nocOkP,children:[
             {id:'nl_vden',name:'Denied by Vendor',count:K.nlVendorDenied,sub:pct(K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'leaf-vendor',action:'→ Reassign vendor',actionCls:'act-amber',pods:deniedP},
             {id:'station_live',name:'Station Live',count:K.stationLive,sub:pct(K.stationLive,K.nocApproved)+' of NOC ✓',type:'rollout',action:'→ Final Rollout',actionCls:'act-green',pods:stationLiveP},
-            {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',pods:nlRest,children:[
-              {id:'nl_wip30',name:'< 30 days',count:K.nlWip+K.nlOverdue,sub:'of WIP',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber',pods:wip30P},
-              {id:'nl_wip30plus',name:'> 30 days',count:K.nlYetToStart,sub:'of WIP',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber',pods:wip30plusP}
-            ]},
-            {id:'noc_upc',name:'Upcoming Pods',count:K.nocYesUpc,sub:pct(K.nocYesUpc,K.nocApproved)+' of NOC ✓',type:'leaf-noc',action:'→ Go-live plan',actionCls:'act-blue',pods:nocYesUpc}
+            {id:'station_wip',name:'Station WIP',count:liveWip+newWip,sub:`${liveWip} live · ${newWip} new · `+pct(liveWip+newWip,K.nocApproved)+' of NOC ✓',type:'noc',pods:wipAllP,children:[
+              {id:'nl_wip30',name:'< 30 days',count:wip30P.length,sub:`${liveU30} live · ${newU30} new`,type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber',pods:wip30P},
+              {id:'nl_wip30plus',name:'> 30 days',count:wip30plusP.length,sub:`${liveO30} live · ${newO30} new`,type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber',pods:wip30plusP}
+            ]}
           ]},
         ]},
         {id:'notfeas',name:'Not Feasible',count:K.notFeasEval,sub:pct(K.notFeasEval,K.evaluated)+' of eval',type:'notfeasible',pods:nfP,children:[
