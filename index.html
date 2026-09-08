@@ -1530,7 +1530,7 @@ function renderT1(){
       <div class="vg-row ${r.total?'':'vg-row-empty'} vg-clickable" data-mk="${r.k}" onclick="vgToggle('${r.k}')">
         <div class="vg-col-month"><div class="vg-mlabel">${mLabel(r.m)}</div>${r.total?'<div class="vg-expand-hint">▾ click to expand</div>':''}</div>
         <div class="vg-col-detail">${vChips(r.vendors)}</div>
-        <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?'<div class="vg-mo-count">+${r.total} this mo</div>':''}</div>
+        <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?`<div class="vg-mo-count">+${r.total} this mo</div>`:''}</div>
       </div>
       ${r.total?`<div class="vg-expand" id="vgx-${r.k}" style="display:none"><table class="vg-detail-table"><thead><tr><th>Pod</th><th>City</th><th>Vendor</th><th>Go-live date</th></tr></thead><tbody>${dated.filter(p=>mKey(p.date)===r.k).map(p=>`<tr><td><b>${p.pod_name||p.pod_id}</b></td><td>${p.city||'—'}</td><td>${p.vendor}</td><td style="white-space:nowrap">${fmtD(p.date)}</td></tr>`).join('')}</tbody></table></div>`:''}`).join('')}
   </div>
