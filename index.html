@@ -1258,8 +1258,9 @@ function treeHTML(){
             {id:'station_wip',name:'Station WIP',count:K.stationNotLive-K.nlVendorDenied,sub:pct(K.stationNotLive-K.nlVendorDenied,K.nocApproved)+' of NOC ✓',type:'noc',pods:nlRest,children:[
               {id:'nl_wip30',name:'< 30 days',count:K.nlWip+K.nlOverdue,sub:'of WIP',type:'leaf-noc',action:'→ 30d live / start',actionCls:'act-amber',pods:wip30P},
               {id:'nl_wip30plus',name:'> 30 days',count:K.nlYetToStart,sub:'of WIP',type:'leaf-noc',action:'→ Set go-live',actionCls:'act-amber',pods:wip30plusP}
-            ]}
-          ]}
+            ]},
+            {id:'noc_upc',name:'Upcoming Pods',count:K.nocYesUpc,sub:pct(K.nocYesUpc,K.nocApproved)+' of NOC ✓',type:'leaf-noc',action:'→ Go-live plan',actionCls:'act-blue',pods:nocYesUpc}
+          ]},
         ]},
         {id:'notfeas',name:'Not Feasible',count:K.notFeasEval,sub:pct(K.notFeasEval,K.evaluated)+' of eval',type:'notfeasible',pods:nfP,children:[
           {id:'space',name:'Space Blocked',count:K.nfSpace,type:'leaf-space',action:'→ Re-site',actionCls:'act-red',pods:spaceP},
