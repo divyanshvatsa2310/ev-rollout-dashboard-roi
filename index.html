@@ -596,12 +596,11 @@ function computeKPIs(universe,assessed,roi){
   // Upcoming 30d split: live vs upcoming (by store_status)
   const upc30Live=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)&&p.store_status==="live").length;
   const upc30Upc=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)&&p.store_status==="upcoming_live").length;
-  // All upcoming = any pod with a target_go_live that's in the future (regardless of 30-day window)
-  const toD=(v)=>{ if(!v) return null; const n=Number(v); if(!isNaN(n)&&n>20000&&n<60000) return new Date(Math.round((n-25569)*86400*1000)); const d=new Date(v); return isNaN(d)?null:d; };
-  const futureTarget=(p)=>{ const d=toD(p.target_go_live); return d!=null && d>=today; };
-  const upcomingAll=assessed.filter(p=>p.target_go_live&&!p.ev_live&&futureTarget(p)).length;
-  const upcomingAllLive=assessed.filter(p=>p.target_go_live&&!p.ev_live&&futureTarget(p)&&p.store_status==="live").length;
-  const upcomingAllUpc=assessed.filter(p=>p.target_go_live&&!p.ev_live&&futureTarget(p)&&p.store_status==="upcoming_live").length;
+  // "Upcoming" = target set but station not yet live (future targets + overdue targets both count)
+  const hasTargetNotLive=(p)=>!!p.target_go_live && !p.ev_live;
+  const upcomingAll=assessed.filter(p=>hasTargetNotLive(p)).length;
+  const upcomingAllLive=assessed.filter(p=>hasTargetNotLive(p)&&p.store_status==="live").length;
+  const upcomingAllUpc=assessed.filter(p=>hasTargetNotLive(p)&&p.store_status==="upcoming_live").length;
   // Rejected by Yuma = landlord approved (NOC=Yes) but vendor declined (notes: "Rejected by Vendor")
   const rejectedYuma=assessed.filter(p=>p.noc_status==="Yes"&&p.notes&&/rejected by vendor/i.test(String(p.notes))).length;
   // "Yet to start" (updated rule): NOC=Yes AND no issue in notes AND target_go_live is 30+ days from today (or no target)
