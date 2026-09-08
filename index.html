@@ -398,8 +398,8 @@ tbody tr:hover{background:#f8fafc}
       <div class="sub">Coverage funnel · opening projection · power-enhancement ROI</div>
     </div>
     <div class="meta">
-      <select id="asof" class="chip" title="View as on date" style="cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--navy);font-weight:600;font-size:12px;max-width:260px">
-        <option value="seed">Seed baseline — 2025-09-04</option>
+      <select id="asof" class="chip" title="View as on date — current data or a saved snapshot" style="cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--navy);font-weight:600;font-size:12px;max-width:260px">
+        <option value="current">Current — as of today</option>
       </select>
       <span class="chip" id="batch">Batch —</span>
       <span class="chip" id="dirtyFlag" style="display:none;background:#fef3c7;color:#92400e;border-color:#f59e0b">● Unsaved changes</span>
@@ -816,7 +816,7 @@ document.getElementById("fileInput").addEventListener("change",function(e){
       ROI=buildROI();   // rebuild ROI cards from the freshly-uploaded sheet
       document.getElementById("batch").textContent="Batch: "+file.name;
       // stash the live (unsaved) blob so Save + the dropdown can reach it
-      window.__LIVE={raw:{universe:parsed.universe.slice(),assessed:parsed.assessed.slice(),roi:parsed.roi.slice(),yulu:(parsed.yulu||[]).slice()}, as_of:DATA.as_of, batch:file.name, rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
+      window.__LIVE={raw:{universe:parsed.universe.slice(),assessed:parsed.assessed.slice(),roi:parsed.roi.slice(),yulu:(parsed.yulu||[]).slice()}, as_of:DATA.as_of, batch:file.name, rateCard:JSON.parse(JSON.stringify(RATE_CARD)), unsaved:true};
       refreshVersionDropdown("live");
       status.textContent="✓ Loaded: "+kpis.total+" pods, "+kpis.assessed+" assessed · as-of "+DATA.as_of;
       status.style.color="#86efac";
@@ -831,7 +831,7 @@ document.getElementById("fileInput").addEventListener("change",function(e){
 
 /* ============ PERSISTENCE: Save + View-as-on-date versions ============ */
 // Versions are stored in localStorage under "evr_versions" as { id, label, as_of, batch, raw:{...}, rateCard:{...} }.
-// "live" is an in-memory transient state (uploaded but not yet saved). "seed" is the original baseline.
+// "live" is an in-memory transient state (uploaded but not yet saved). "current" is the embedded workbook data as of today.
 const VER_KEY="evr_versions";
 function loadVersions(){ try{ return JSON.parse(localStorage.getItem(VER_KEY)||"[]"); }catch{ return []; } }
 function saveVersions(v){ localStorage.setItem(VER_KEY, JSON.stringify(v)); }
@@ -839,52 +839,54 @@ function refreshVersionDropdown(selected){
   const sel=document.getElementById("asof");
   const v=loadVersions();
   const cur=sel.value;
-  // rebuild options: seed baseline + all saved versions (newest first)
-  sel.innerHTML='<option value="seed">Seed baseline — 2025-09-04</option>';
+  // rebuild options: current data + saved history snapshots (newest first)
+  sel.innerHTML='<option value="current">Current — as of today</option>';
   v.slice().reverse().forEach(ver=>{
-    const o=document.createElement("option"); o.value=ver.id; o.textContent=ver.label; sel.appendChild(o);
+    const o=document.createElement("option"); o.value=ver.id; o.textContent="🕘 "+ver.label; sel.appendChild(o);
   });
-  // transient "live" entry (uploaded-but-unsaved) — shown only when present
-  if(window.__LIVE){ const o=document.createElement("option"); o.value="live"; o.textContent="Live (unsaved upload) — "+window.__LIVE.as_of; sel.appendChild(o); }
-  sel.value = selected || cur || "seed";
+  // transient "live" entry (uploaded-but-unsaved) — shown only while an upload is pending save
+  if(window.__LIVE && window.__LIVE.unsaved){ const o=document.createElement("option"); o.value="live"; o.textContent="Live (unsaved upload) — "+window.__LIVE.as_of; sel.appendChild(o); }
+  sel.value = selected || cur || "current";
 }
 function markDirty(yes){
   const f=document.getElementById("dirtyFlag"); if(f) f.style.display = yes ? "inline-block" : "none";
 }
-// Save current live state (uploaded or seed) as a new named version
+// Save the active dataset as a named history snapshot
 document.getElementById("saveBtn").addEventListener("click",function(){
-  // what is "current"? if a saved version is selected, we save a copy of it; if live, save the live blob; else seed
   const sel=document.getElementById("asof").value;
   let blob;
   if(sel==="live" && window.__LIVE){ blob={raw:window.__LIVE.raw, as_of:window.__LIVE.as_of, batch:window.__LIVE.batch, rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
-  else if(sel==="seed"){ blob={raw:{universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()}, as_of:DATA.as_of, batch:"Seed baseline", rateCard:JSON.parse(JSON.stringify(RATE_CARD))}; }
+  else if(sel==="current"){
+    // save whatever is currently active in RAW (embedded data or last upload applied)
+    blob={raw:{universe:RAW.universe,assessed:RAW.assessed,roi:RAW.roi,yulu:RAW.yulu||[]}, as_of:DATA.as_of, batch:document.getElementById("batch").textContent.replace("Batch: ","")||"Current data", rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
+  }
   else {
     const v=loadVersions(); const found=v.find(x=>x.id===sel);
     if(!found){ alert("Nothing to save — upload a file first."); return; }
     blob={raw:found.raw, as_of:found.as_of, batch:found.batch, rateCard:JSON.parse(JSON.stringify(RATE_CARD))};
   }
-  const name=prompt("Name this version (e.g. "+todayISO()+" upload):", "Snapshot "+todayISO());
+  const name=prompt("Name this snapshot (e.g. "+todayISO()+" review):", "Snapshot "+todayISO());
   if(!name) return;
   const id="v_"+Date.now();
   const ver={id, label:name+" — "+blob.as_of, as_of:blob.as_of, batch:blob.batch, raw:blob.raw, rateCard:blob.rateCard};
   const all=loadVersions(); all.push(ver); saveVersions(all);
-  // keep the live blob in memory too so re-selecting "live" still works, then clear dirty
-  if(window.__LIVE){ window.__LIVE.raw=blob.raw; }
+  if(window.__LIVE){ window.__LIVE.unsaved=false; }   // upload is now persisted as a snapshot
   applyVersion(ver, true);
   refreshVersionDropdown(id);
   markDirty(false);
-  const status=document.getElementById("uploadStatus"); status.style.display="inline-block"; status.textContent="✓ Saved: "+name; status.style.color="#86efac";
+  const status=document.getElementById("uploadStatus"); status.style.display="inline-block"; status.textContent="✓ Snapshot saved: "+name; status.style.color="#86efac";
   setTimeout(()=>{ status.style.display="none"; }, 4000);
 });
 // Switch active dataset when the dropdown changes
 document.getElementById("asof").addEventListener("change",function(e){
   const id=e.target.value;
   if(id==="live" && window.__LIVE){ applyLive(); return; }
-  if(id==="seed"){ applySeed(); return; }
+  if(id==="current"){ applyCurrent(); return; }
   const v=loadVersions().find(x=>x.id===id);
   if(v) applyVersion(v, false);
 });
-function applySeed(){
+// "Current" = the embedded workbook data, viewed as of today
+function applyCurrent(){
   DATA.as_of=todayISO();
   RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()};
   rebuildYulu();
@@ -892,7 +894,7 @@ function applySeed(){
   CITY="All"; document.getElementById("cityFilter").value="All";
   const kpis=computeKPIs(RAW.universe,RAW.assessed,RAW.roi);
   applyData(kpis); ROI=buildROI();
-  document.getElementById("batch").textContent="Batch: Seed baseline";
+  document.getElementById("batch").textContent="Batch: Current data";
   markDirty(false);
 }
 function applyLive(){
@@ -1113,12 +1115,14 @@ function recompute(){
   applyData(kpis);
   ROI=buildROI();   // refresh ROI cards from uploaded sheet (region-aware via RAW)
 }
-// init RAW from seed
+// init RAW from the embedded (current) data — viewed as of today
+DATA.as_of=todayISO();
 RAW={universe:RAW_SEED.universe.slice(),assessed:RAW_SEED.assessed.slice(),roi:RAW_SEED.roi.slice(),yulu:(RAW_SEED.yulu||[]).slice()};
 rebuildYulu();
-ROI=buildROI();   // build initial ROI cards from seeded data
+ROI=buildROI();   // build initial ROI cards from the embedded data
 populateCities();
-refreshVersionDropdown("seed");
+document.getElementById("batch").textContent="Batch: Current data";
+refreshVersionDropdown("current");
 document.getElementById("cityFilter").addEventListener("change",e=>{ CITY=e.target.value; recompute(); });
 // Yulu toggle: show/hide priority badges on tree nodes
 document.getElementById("yuluToggle").addEventListener("click",function(){
