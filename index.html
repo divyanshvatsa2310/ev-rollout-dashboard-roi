@@ -608,8 +608,10 @@ function computeKPIs(universe,assessed,roi){
   const upcoming30=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)).length;
   const upc30Live=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)&&p.store_status==="live").length;
   const upc30Upc=assessed.filter(p=>p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live)&&p.store_status==="upcoming_live").length;
-  // "Upcoming" tile = WIP pods with a target within 30 days (or overdue) of the as-of date
-  const hasTargetNotLive=(p)=>nocOkNotLive(p)&&!!p.target_go_live&&within30Today(p.target_go_live);
+  // "Upcoming" tile = NOT EV-live pods with a target within 30 days (or overdue) of the as-of date.
+  // Matches the Excel count: includes vendor-denied pods (they still have a go-live target; the
+  // vendor issue is tracked separately in "Rejected by Yuma" / tree "Denied by Vendor").
+  const hasTargetNotLive=(p)=>!!p.target_go_live&&!p.ev_live&&within30Today(p.target_go_live);
   const upcomingAll=assessed.filter(p=>hasTargetNotLive(p)).length;
   const upcomingAllLive=assessed.filter(p=>hasTargetNotLive(p)&&p.store_status==="live").length;
   const upcomingAllUpc=assessed.filter(p=>hasTargetNotLive(p)&&p.store_status==="upcoming_live").length;
@@ -832,7 +834,7 @@ document.getElementById("fileInput").addEventListener("change",function(e){
       // stash the live (unsaved) blob so Save + the dropdown can reach it
       window.__LIVE={raw:{universe:parsed.universe.slice(),assessed:parsed.assessed.slice(),roi:parsed.roi.slice(),yulu:(parsed.yulu||[]).slice()}, as_of:DATA.as_of, batch:file.name, rateCard:JSON.parse(JSON.stringify(RATE_CARD)), unsaved:true};
       refreshVersionDropdown("live");
-      status.textContent="✓ Loaded: "+kpis.total+" pods, "+kpis.assessed+" assessed · as-of "+DATA.as_of;
+      status.textContent="✓ Loaded: "+kpis.total+" pods, "+kpis.assessed+" assessed · as-of "+fmtD(DATA.as_of);
       status.style.color="#86efac";
       markDirty(true);
     }catch(err){
@@ -1183,7 +1185,7 @@ function podsForTile(key){
     case "upcoming30": return a.filter(p=>p.target_go_live&&!p.ev_live&&dfAsOf(p.target_go_live)!==null&&dfAsOf(p.target_go_live)>=0&&dfAsOf(p.target_go_live)<=30);
     case "rejectedYuma": return a.filter(p=>p.noc_status==="Yes"&&p.notes&&/rejected by vendor/i.test(String(p.notes)));
     case "yetToStart": return a.filter(p=>wipPath(p)&&(!p.target_go_live||dfAsOf(p.target_go_live)===null||dfAsOf(p.target_go_live)>30));
-    case "upcomingAll": return a.filter(p=>wipPath(p)&&p.target_go_live&&dfAsOf(p.target_go_live)!==null&&dfAsOf(p.target_go_live)<=30);
+    case "upcomingAll": return a.filter(p=>p.target_go_live&&!p.ev_live&&dfAsOf(p.target_go_live)!==null&&dfAsOf(p.target_go_live)<=30);
     case "blk_space": return a.filter(p=>p.space_available==="N");
     case "blk_power": return a.filter(p=>p.power_available==="N");
     case "blk_noc": return a.filter(p=>p.store_status==="live"&&p.feasible&&p.noc_status!=="Yes");
