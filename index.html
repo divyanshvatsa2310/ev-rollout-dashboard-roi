@@ -193,6 +193,18 @@ tbody tr:hover{background:#f8fafc}
 
 /* roi */
 .roi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+/* ROI strategy table: clickable rows, pass/fail payback cells */
+.roi-table td{font-size:12px}
+.roi-tr{cursor:pointer}
+.roi-tr:hover{background:#f1f5f9}
+.roi-table td.pass{color:var(--green);font-weight:700}
+.roi-table td.fail{color:var(--red);font-weight:600}
+/* ROI strategy table: clickable rows, pass/fail payback cells */
+.roi-table td{font-size:12px}
+.roi-tr{cursor:pointer}
+.roi-tr:hover{background:#f1f5f9}
+.roi-table td.pass{color:var(--green);font-weight:700}
+.roi-table td.fail{color:var(--red);font-weight:600}
 /* ============ RATE CARD EDITOR (collapsible) ============ */
 .rc-collapse{margin-bottom:14px;border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden}
 .rc-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;background:#f8fafc}
@@ -1014,6 +1026,14 @@ const RATE_CARD={
   "Mumbai":   {mode:"additive", perKwh:10000, flat:0,      limit:40}
 };
 const DEFAULT_RATE={mode:"additive", perKwh:0, flat:0, limit:Infinity};
+/* Productivity-strategy assumptions (Strategy B). Editable in the ROI tab.
+   swapsPerDay   : battery swaps a rider makes per day (2 = "swap twice in total")
+   minsPerSwap   : minutes lost per swap incl. detour + queue
+   activeHours   : rider's active working hours per day
+   payoutPerOrder: rider earning per delivered order (₹)
+   companyShare  : fraction of the earning uplift the company takes as infra contribution */
+const PROD_PARAMS={swapsPerDay:2, minsPerSwap:30, activeHours:10, payoutPerOrder:35, companyShare:0.5};
+const PROD_DEFAULTS={...PROD_PARAMS};
 function oneTimeCost(city,addlLoad){
   if(addlLoad==null) return null;
   const rc=RATE_CARD[city];
@@ -1551,54 +1571,114 @@ function blockerTodoHTML(key){
 
 function renderT2(){
   document.getElementById('t2').innerHTML=`
+  ${roiStrategySummaryHTML()}
+  <div class="card"><h3>Pod Detail — Space ✓ Power ✗ <span class="sow">both ROI strategies per pod · sorted by best payback</span></h3>
+    <div class="scroll"><table class="roi-table"><thead><tr>
+      <th>Pod</th><th>City</th><th>Addl load</th><th>Capex</th>
+      <th>A: Save/mo</th><th>A: Payback</th>
+      <th>B: Share/mo</th><th>B: Payback</th><th>Extra orders/day</th>
+      <th>Best</th><th>Verdict</th></tr></thead>
+      <tbody>${ROI.filter(r=>r.spaceY&&r.powerN).map(roiRow).join('')}</tbody></table></div>
+    <div class="small muted" style="margin-top:10px">A = cost saving (per-order EV saving × orders × EV riders). B = productivity (time saved on swaps → extra orders; company keeps ${Math.round(PROD_PARAMS.companyShare*100)}% of the uplift). Payback hurdle: 12 months. Click a row's pod for its modal.</div>
+  </div>
+  ${prodParamsEditorHTML()}
   ${rateCardEditorHTML()}
-  ${roiSummaryHTML()}
-  <div class="card"><h3>ROI Calculation — Power-Blocked + Vendor Interest <span class="sow">one-time enhance cost vs monthly saving</span></h3>
-    <div class="roi-grid">${ROI.map(roiCard).join('')}</div>
-    <div class="small muted" style="margin-top:10px">One-time cost = city rate card × additional load. Monthly saving = orders/rider/mo × saving/order × EV riders (at target %). <b>enhance</b> if monthly saving recovers the one-time cost within 12 months; else <b>reject</b>. &gt;100 kWh pods flagged for a manual HV quote.</div>
-  </div>
-  <div class="card"><h3>Next-Step Action Table <span class="sow">no orphans — every pod has an owner + due date</span></h3>
-    <div class="scroll"><table><thead><tr><th>Pod</th><th>City</th><th>Present</th><th>Addl load</th><th>One-time cost</th><th>Saving / mo</th><th>Saving / yr</th><th>Payback</th><th>Recommendation</th><th>Next action</th><th>Owner</th><th>Due</th></tr></thead>
-    <tbody>${ROI.map(r=>`<tr><td><b>${r.pod_id}</b></td><td>${r.city}</td><td>${r.present!=null?r.present+' kWh':'—'}</td><td>${r.addl!=null?r.addl+' kWh':'—'}</td><td>${r.oneTimeCost!=null?inr(r.oneTimeCost):(r.hasRate===false?'manual':r.rec==='pending'?'—':'manual')}</td><td>${r.savingMonth!=null?inr(r.savingMonth):'—'}</td><td>${r.savingYear!=null?inr(r.savingYear):'—'}</td><td>${r.payback!=null?r.payback+' mo':'—'}</td><td><span class="rec ${r.rec}">${r.rec}</span></td><td>${r.next}</td><td>${r.owner}</td><td>${r.due}</td></tr>`).join('')}</tbody></table></div>
-  </div>
   <div class="small muted" style="max-width:1400px;margin:0 auto;padding:0 4px 16px;line-height:1.5">
-    <b>Methodology.</b> Inputs: Assessment sheet (${RAW.assessed.length} pods), ROI sheet (${RAW.roi.length} pods with rider &amp; load data), rate card (${Object.keys(RATE_CARD).length} cities: ${Object.keys(RATE_CARD).join(', ')}). One-time cost = rate card × <code>additional_load_required</code>. Monthly saving = <code>orders_per_rider_month</code> × <code>per_order_ev_saving</code> × (<code>riders_at_pod</code> × <code>rider_ev_share_target_pct</code> ÷ 100); figures are steady-state at target EV share. Payback = one-time cost ÷ monthly saving. Hurdle: 12 months. Pods with total load &gt;100 kWh, or in cities absent from the rate card, are flagged for a manual quote rather than auto-recommended. Data as of ${fmtD(DATA.as_of)}.
+    <b>Methodology.</b> Scope: ${ROI.filter(r=>r.spaceY&&r.powerN).length} pods with space available but power blocked (all have ROI-sheet inputs). Capex = city rate card × additional load. Strategy A saving = orders/rider/mo × per-order EV saving × EV riders at target share. Strategy B: a rider swapping ${PROD_PARAMS.swapsPerDay}×/day at ${PROD_PARAMS.minsPerSwap} min loses ${PROD_PARAMS.swapsPerDay*PROD_PARAMS.minsPerSwap} min/day; at ${PROD_PARAMS.activeHours} h active that time converts to extra orders × ₹${PROD_PARAMS.payoutPerOrder}/order; company credits ${Math.round(PROD_PARAMS.companyShare*100)}% of the uplift. Enhance = either strategy pays back ≤ 12 months.
   </div>`;
 }
-/* ROI summary header — total ask, total monthly/annual saving, blended payback, counts */
-function roiSummaryHTML(){
-  const enh=ROI.filter(r=>r.rec==='enhance');
-  const rej=ROI.filter(r=>r.rec==='reject');
-  const pend=ROI.filter(r=>r.rec==='pending');
-  const disc=ROI.filter(r=>r.rec==='disclaimer');
-  const sum=a=>a.reduce((s,r)=>s+(r||0),0);
-  const totalCapex=sum(enh.map(r=>r.oneTimeCost||0));
-  const totalMoSaving=sum(enh.map(r=>r.savingMonth||0));
-  const totalYrSaving=sum(enh.map(r=>r.savingYear||0));
-  const blendedPayback=totalMoSaving>0?(totalCapex/totalMoSaving).toFixed(1):'—';
+/* ROI strategy summary — scope, both strategies side by side, verdict counts */
+function roiStrategySummaryHTML(){
+  const scope=ROI.filter(r=>r.spaceY&&r.powerN);
+  const enh=scope.filter(r=>r.rec==='enhance');
+  const passA=scope.filter(r=>r.payback!=null&&r.payback<=12);      // strategy A's own passers
+  const passB=scope.filter(r=>r.prodPayback!=null&&r.prodPayback<=12); // strategy B's own passers
+  const sum=a=>a.reduce((s,x)=>s+(x||0),0);
+  const capexAll=sum(scope.map(r=>r.oneTimeCost||0));
   const tile=(label,val,sub,cls)=>`<div class="kpi-block"><div class="kpi-big ${cls}"><div class="lbl">${label}</div><div class="num">${val}</div><div class="sub">${sub}</div></div></div>`;
+  const capexA=sum(passA.map(r=>r.oneTimeCost||0)), capexB=sum(passB.map(r=>r.oneTimeCost||0));
+  const moA=sum(passA.map(r=>r.savingMonth||0)), moB=sum(passB.map(r=>r.prodSavingMonth||0));
   return `<div class="kpi-row">
-    ${tile('Total capex (enhance)',inr(totalCapex),'one-time cost across '+enh.length+' pods','acc-navy')}
-    ${tile('Monthly saving',inr(totalMoSaving),'at target EV share','acc-green')}
-    ${tile('Annual saving',inr(totalYrSaving),'= monthly × 12','acc-green')}
-    ${tile('Blended payback',blendedPayback+' mo','capex ÷ monthly saving','acc-blue')}
-    ${tile('Recommendations',enh.length+' enhance · '+rej.length+' reject',(pend.length?pend.length+' pending · ':'')+(disc.length?disc.length+' manual':'')+'','acc-amber')}
+    ${tile('Space ✓ Power ✗', scope.length, 'pods in scope · capex '+inr(capexAll)+' if all done','acc-navy')}
+    ${tile('Strategy A — cost saving', passA.length+' of '+scope.length+' pass', 'capex '+inr(capexA)+' · saves '+inr(moA)+'/mo · payback '+(moA>0?(capexA/moA).toFixed(1):'—')+' mo','acc-amber')}
+    ${tile('Strategy B — productivity', passB.length+' of '+scope.length+' pass', 'capex '+inr(capexB)+' · company share '+inr(moB)+'/mo · payback '+(moB>0?(capexB/moB).toFixed(1):'—')+' mo','acc-blue')}
+    ${tile('Go ahead (best of A/B)', enh.length+' pods', inr(sum(enh.map(r=>r.oneTimeCost||0)))+' total capex · '+inr(sum(enh.map(r=>r.best==='A'?r.savingMonth||0:r.prodSavingMonth||0)))+'/mo blended saving','acc-green')}
+    ${tile('Don’t proceed', scope.length-enh.length+' pods', 'no strategy pays back ≤12 mo (or pending inputs)','acc-navy')}
   </div>`;
 }
-function roiCard(r){
-  if(r.rec==='pending') return `<div class="roi-card pending"><div class="hd"><span class="pid">${r.pod_id} · ${r.pod_name}</span><span class="rec pending">pending</span></div><div class="small muted">${r.city} · present ${r.present!=null?r.present+' kWh':'—'} · addl ${r.addl!=null?r.addl+' kWh':'—'}</div><div class="callout" style="margin-top:8px">⚠ ${r.next}</div><div style="font-size:11px;color:var(--muted);margin-top:6px"><b>Owner:</b> ${r.owner} · <b>Due:</b> ${r.due}</div></div>`;
-  if(r.rec==='disclaimer') return `<div class="roi-card disclaimer"><div class="hd"><span class="pid">${r.pod_id} · ${r.pod_name}</span><span class="rec disclaimer">disclaimer</span></div><div class="small muted">${r.city} · total ${r.total!=null?r.total+' kWh':'—'} — exceeds 100 kWh</div><div class="disclaimer" style="margin-top:8px">⚠ ${r.next}</div><div style="font-size:11px;color:var(--muted);margin-top:6px"><b>Owner:</b> ${r.owner} · <b>Due:</b> ${r.due}</div></div>`;
-  const costDisp=r.oneTimeCost!=null?inr(r.oneTimeCost):(r.hasRate===false?'<span style="color:var(--amber)">manual quote</span>':'—');
-  return `<div class="roi-card ${r.rec}">
-    <div class="hd"><span class="pid">${r.pod_id} · ${r.pod_name}</span><span class="rec ${r.rec}">${r.rec}</span></div>
-    <div class="small muted">${r.city} · present ${r.present!=null?r.present+' kWh':'—'} · additional ${r.addl!=null?r.addl+' kWh':'—'} · total ${r.total!=null?r.total+' kWh':'—'}</div>
-    <div class="sc">
-      <div class="s ${r.rec==='enhance'?'win':''}"><div class="h">One-time cost to enhance</div><div class="v ${r.rec==='reject'?'pos':'neg'}">${costDisp}</div></div>
-      <div class="s ${r.rec==='enhance'?'win':''}"><div class="h">Monthly saving (max)</div><div class="v pos">${inr(r.savingMonth)}</div><div class="small muted" style="margin-top:2px">${inr(r.savingYear)}/yr</div></div>
+/* Productivity assumption editor (collapsible, same pattern as rate card) */
+function prodParamsEditorHTML(){
+  const isOpen=document.getElementById('ppEditor')&&document.getElementById('ppEditor').classList.contains('open');
+  const P=PROD_PARAMS;
+  return `<div class="rc-collapse ${isOpen?'open':''}" id="ppEditor">
+    <div class="rc-head" onclick="document.getElementById('ppEditor').classList.toggle('open')">
+      <span class="rc-title"><span class="rc-chev">▶</span> Productivity assumptions — Strategy B</span>
+      <span class="small muted">click to ${isOpen?'collapse':'expand'}</span>
     </div>
-    <div class="meta"><span>Payback ${r.payback!=null?r.payback+' mo':'—'} · EV riders ${r.riders!=null&&r.tar!=null?Math.round(r.riders*r.tar/100):'—'}</span><span>Riders ${r.riders||'—'} @ ${r.tar!=null?r.tar+'%':''}</span></div>
-    <div class="next"><b>Next:</b> ${r.next}<br><b>Owner:</b> ${r.owner} · <b>Due:</b> ${r.due}</div>
+    <div class="rc-body">
+      <table class="rc-table">
+        <thead><tr><th>Swaps / rider / day</th><th>Min lost per swap</th><th>Active hrs / day</th><th>Rider payout / order (₹)</th><th>Company share of uplift</th></tr></thead>
+        <tbody><tr>
+          <td><input class="pp-swaps" type="number" min="0" step="1" value="${P.swapsPerDay}"></td>
+          <td><input class="pp-mins" type="number" min="0" step="5" value="${P.minsPerSwap}"></td>
+          <td><input class="pp-hours" type="number" min="1" step="1" value="${P.activeHours}"></td>
+          <td><input class="pp-payout" type="number" min="0" step="1" value="${P.payoutPerOrder}"></td>
+          <td><input class="pp-share" type="number" min="0" max="1" step="0.05" value="${P.companyShare}"></td>
+        </tr></tbody>
+      </table>
+      <div class="rc-actions">
+        <button class="rc-btn primary" onclick="applyProdParams()">Apply &amp; recompute</button>
+        <button class="rc-btn" onclick="resetProdParams()">Reset to defaults</button>
+        <span class="rc-apply" id="ppApplied" style="display:none">✓ Applied — ROI recalculated</span>
+      </div>
+      <div class="small muted" style="margin-top:6px">Rider does ${P.swapsPerDay} swaps/day × ${P.minsPerSwap} min = ${P.swapsPerDay*P.minsPerSwap} min/day of swap time. Over ${P.activeHours} active hrs that equals ${(P.swapsPerDay*P.minsPerSwap/60).toFixed(1)} hrs ≈ ${Math.round((P.swapsPerDay*P.minsPerSwap/(P.activeHours*60))*100)}% of the day converted into extra orders at ₹${P.payoutPerOrder}/order. Company takes ${Math.round(P.companyShare*100)}% of the earning uplift as the swap-infra contribution; rider still nets the rest.</div>
+    </div>
   </div>`;
+}
+function applyProdParams(){
+  const g=id=>Number(document.querySelector('#ppEditor .'+id).value);
+  PROD_PARAMS.swapsPerDay=g('pp-swaps'); PROD_PARAMS.minsPerSwap=g('pp-mins'); PROD_PARAMS.activeHours=g('pp-hours');
+  PROD_PARAMS.payoutPerOrder=g('pp-payout'); PROD_PARAMS.companyShare=g('pp-share');
+  ROI=buildROI(); renderT2();
+  const el=document.getElementById('ppApplied'); if(el){ el.style.display='inline'; setTimeout(()=>el.style.display='none',2000); }
+}
+function resetProdParams(){ Object.assign(PROD_PARAMS,PROD_DEFAULTS); ROI=buildROI(); renderT2(); }
+/* Per-pod row for the strategy table */
+function roiRow(r){
+  const pbA=r.payback!=null?r.payback+' mo':'—', pbB=r.prodPayback!=null?r.prodPayback+' mo':'—';
+  const passA=r.payback!=null&&r.payback<=12, passB=r.prodPayback!=null&&r.prodPayback<=12;
+  return `<tr class="roi-tr ${r.rec}" onclick="openRoiPodModal('${String(r.pod_id).replace(/'/g,"")}')">
+    <td><b>${r.pod_name||r.pod_id}</b><div class="small muted">${r.pod_id}</div></td>
+    <td>${r.city}</td>
+    <td>${r.addl!=null?r.addl+' kWh':'—'}</td>
+    <td>${r.oneTimeCost!=null?inr(r.oneTimeCost):'manual'}</td>
+    <td>${r.savingMonth!=null?inr(r.savingMonth):'—'}</td>
+    <td class="${passA?'pass':'fail'}">${pbA}</td>
+    <td>${r.prodSavingMonth!=null?inr(r.prodSavingMonth):'—'}</td>
+    <td class="${passB?'pass':'fail'}">${pbB}</td>
+    <td>+${r.prodExtraOrdersDay!=null?r.prodExtraOrdersDay:'—'}</td>
+    <td>${r.best?('<span class="rec '+(r.best==='A'?'pending':'disclaimer')+'">'+(r.best==='A'?'A · cost':'B · prod')+'</span>'):r.rec==='reject'?'—':'—'}</td>
+    <td><span class="rec ${r.rec}">${r.rec}</span></td>
+  </tr>`;
+}
+function openRoiPodModal(pid){
+  const r=ROI.find(x=>String(x.pod_id)===String(pid)); if(!r) return;
+  const passA=r.payback!=null&&r.payback<=12, passB=r.prodPayback!=null&&r.prodPayback<=12;
+  const row=(lbl,a,b,cls)=>`<tr><td><b>${lbl}</b></td><td>${a}</td><td>${b}</td></tr>`;
+  document.getElementById('modalRoot').innerHTML=`<div class="modal-overlay" id="ovl"><div class="modal"><div class="modal-head"><h3>${r.pod_name} — ROI detail</h3><span class="close" id="mclose">×</span></div>
+    <div class="modal-body">
+      <table><thead><tr><th></th><th>A · Cost saving</th><th>B · Productivity</th></tr></thead><tbody>
+      ${row('Capex (one-time)',r.oneTimeCost!=null?inr(r.oneTimeCost):'manual',r.oneTimeCost!=null?inr(r.oneTimeCost):'manual')}
+      ${row('Monthly benefit',r.savingMonth!=null?inr(r.savingMonth):'—',r.prodSavingMonth!=null?inr(r.prodSavingMonth):'—')}
+      ${row('Payback',r.payback!=null?r.payback+' mo':'—',r.prodPayback!=null?r.prodPayback+' mo':'—')}
+      ${row('Passes ≤12 mo?',passA?'✓':'✗',passB?'✓':'✗')}
+      ${row('Basis','₹'+(r.savingMonth!=null?(r.savingMonth/((r.riders||0)*(r.tar||1)/100||1)).toFixed(0):'—')+'/mo per EV rider',r.prodExtraOrdersDay!=null?'+'+r.prodExtraOrdersDay+' orders/day/rider':'—')}
+      </tbody></table>
+      <div style="margin-top:10px" class="small"><b>Verdict:</b> ${r.rec.toUpperCase()} — ${r.next}</div>
+      <div class="small muted" style="margin-top:6px">${r.riders} riders @ ${r.tar}% EV target · additional load ${r.addl} kWh · city ${r.city}</div>
+    </div></div></div>`;
+  document.getElementById('mclose').onclick=()=>{document.getElementById('modalRoot').innerHTML='';};
+  document.getElementById('ovl').onclick=(e)=>{if(e.target.id==='ovl')document.getElementById('modalRoot').innerHTML='';};
 }
 
 const K = {
@@ -1635,14 +1715,21 @@ function inr(n){ if(n==null||isNaN(n)) return '—'; if(Math.abs(n)>=1e7) return
 function pct(a,b){ return (b>0)?(a/b*100).toFixed(0)+'%' : '—'; }
 
 /* ============ ROI BUILDER (from uploaded ROI sheet) ============ */
-// Joins RAW.roi with RAW.assessed (for pod_name/city/noc/notes). Simple model:
-//   oneTimeCost = city rate card × additional_load_required  (cost to enhance power)
-//   savingMonth = orders_per_rider_month × per_order_ev_saving × riders_on_EV
-//     where riders_on_EV = riders_at_pod × rider_ev_share_target_pct / 100  (max EV state)
-//   savingYear = savingMonth × 12
-//   payback (mo) = oneTimeCost ÷ savingMonth
-// Recommendation: enhance if monthly saving recovers the one-time cost within 12 months;
-// else reject. Missing inputs → pending. City not in rate card → manual quote. total >100 kWh → disclaimer.
+// Joins RAW.roi with RAW.assessed (for pod_name/city/noc/notes). TWO strategies per pod:
+//
+// A) COST SAVING (swap-battery infra replaces petrol / swapping fees):
+//   capex = city rate card × additional_load_required
+//   savingMonth = per_order_ev_saving × orders_per_rider_month × EV riders (at target %)
+//   payback = capex ÷ savingMonth ; enhance if ≤ 12 months
+//
+// B) PRODUCTIVITY GAIN (rider earns from time saved on battery swaps):
+//   A rider doing x orders/day currently spends y total time on battery swaps.
+//   With pod swap infra he swaps on-route (near-zero detour), freeing that time.
+//   extra orders = y_time × orders_per_hour → extra rider earning = extra orders × payout/order
+//   Company keeps 50% of the earning uplift as infra contribution (payout redesigned
+//   so rider still nets more); that 50% is the monthly "saving" credited to the pod.
+//   payback = capex ÷ (50% × uplift); enhance if ≤ 12 months
+function num(v){ const n=Number(v); return (v==null||v===""||isNaN(n))?null:n; }
 function num(v){ const n=Number(v); return (v==null||v===""||isNaN(n))?null:n; }
 function buildROI(){
   const A=RAW.assessed, R=RAW.roi;
@@ -1656,34 +1743,55 @@ function buildROI(){
     const podName=pod.pod_name||r.pod_id;
     const tar=num(r.rider_ev_share_target_pct);
     const perOrder=num(r.per_order_ev_saving), ordersMo=num(r.orders_per_rider_month), riders=num(r.riders_at_pod);
+    const spaceY=pod.space_available==="Y", powerN=pod.power_available==="N";
     const hasRate=rateConfigured(city);
     // One-time cost to enhance power = rate card × additional load (null if city not in card)
     const cost=oneTimeCost(city,addl);
-    // Max saving per month = orders/rider/mo × saving/order × EV riders (at target share)
+    // ---- Strategy A: cost saving ----
     let savingMonth=null, savingYear=null;
     if(perOrder!=null&&ordersMo!=null&&riders!=null&&tar!=null){
       const ridersOnEV=riders*tar/100;
       savingMonth=Math.round(perOrder*ordersMo*ridersOnEV);
       savingYear=savingMonth*12;
     }
-    // Payback (months) = one-time cost ÷ monthly saving
-    const payback=(cost!=null&&savingMonth!=null&&savingMonth>0)?Math.round(cost/savingMonth*10)/10:null;
-    // Recommendation
-    let rec='pending', next='', owner='City Leads', due='—';
+    const paybackA=(cost!=null&&savingMonth!=null&&savingMonth>0)?Math.round(cost/savingMonth*10)/10:null;
+    // ---- Strategy B: productivity gain ----
+    // Rider time currently lost to off-route battery swaps, converted to extra orders.
+    // PROD_PARAMS: swaps/day, min/swap (incl detour+queue), active hours/day, payout/order, company share.
+    const evRidersB=(riders!=null&&tar!=null)?riders*tar/100:null;
+    let prodSavingMonth=null, prodPayback=null, prodExtraOrdersDay=null;
+    if(evRidersB!=null&&ordersMo!=null&&cost!=null){
+      const P=PROD_PARAMS;
+      const ordersPerDay=ordersMo/26;                                  // ~26 working days/month
+      const minsPerOrder=(P.activeHours*60)/ordersPerDay;              // minutes per order incl idle
+      const swapMinsPerDay=P.swapsPerDay*P.minsPerSwap;                // time lost to swaps today
+      const extraOrders=swapMinsPerDay/minsPerOrder;                   // orders rider can add in that time
+      const upliftPerRider=extraOrders*P.payoutPerOrder;               // ₹/day earning uplift per rider
+      const upliftMo=upliftPerRider*26*evRidersB;                      // pod-level monthly uplift
+      prodExtraOrdersDay=Math.round(extraOrders*10)/10;
+      prodSavingMonth=Math.round(P.companyShare*upliftMo);            // company's 50% share
+      prodPayback=(prodSavingMonth>0)?Math.round(cost/prodSavingMonth*10)/10:null;
+    }
+    // Best strategy per pod (12-month hurdle)
+    let rec='pending', next='', owner='City Leads', due='—', best=null;
     const nstr=String(pod.notes||r.notes||"").toLowerCase();
     const disclaimer = /exceeds 100|exceed 100|>100/.test(nstr) || (total!=null&&total>100);
     const lowTraffic = /low traffic|reject/.test(nstr);
+    const aOK=paybackA!=null&&paybackA<=12, bOK=prodPayback!=null&&prodPayback<=12;
     if(disclaimer){ rec='disclaimer'; next='Custom HV quote — exceeds 100 kWh. Manual ROI needed.'; owner='RE Team'; due='+2 wk'; }
     else if(!hasRate){ rec='pending'; next='Rate not configured for '+city+' — manual quote needed.'; owner='RE Team'; due='+1 wk'; }
     else if(perOrder==null||ordersMo==null||riders==null||tar==null||addl==null){ rec='pending'; next='Awaiting rider/load inputs on ROI tab.'; owner='City Leads'; due='+1 wk'; }
     else if(lowTraffic){ rec='reject'; next='Low traffic / reject flagged in notes — skip enhancement.'; owner='City Leads'; due='+1 wk'; }
-    else if(savingMonth!=null && savingMonth>0 && payback!=null && payback<=12){
-      rec='enhance'; next='Approve — one-time '+inr(cost)+', saves '+inr(savingMonth)+'/mo, payback '+payback+' mo.'; owner='Ops'; due='+3 wk';
+    else if(aOK||bOK){
+      best=(aOK&&bOK)?(paybackA<=prodPayback?'A':'B'):(aOK?'A':'B');
+      const s=best==='A'?savingMonth:prodSavingMonth, pb=best==='A'?paybackA:prodPayback;
+      rec='enhance'; next='Approve via '+(best==='A'?'cost-saving':'productivity')+' — '+inr(cost)+' one-time, '+inr(s)+'/mo, payback '+pb+' mo.'; owner='Ops'; due='+3 wk';
     }
-    else { rec='reject'; next='Reject — one-time '+inr(cost)+' vs '+inr(savingMonth)+'/mo saving, payback '+(payback!=null?payback+' mo':'—')+'.'; owner='City Leads'; due='+1 wk'; }
-    return {pod_id:r.pod_id,pod_name:podName,city,total,present,addl,hasRate,
-      oneTimeCost:cost,savingMonth,savingYear,payback,rec,next,owner,due,
-      riders,tar};
+    else { rec='reject'; next='Neither strategy pays back within 12 months (A: '+(paybackA!=null?paybackA+' mo':'—')+' · B: '+(prodPayback!=null?prodPayback+' mo':'—')+').'; owner='City Leads'; due='+1 wk'; }
+    return {pod_id:r.pod_id,pod_name:podName,city,total,present,addl,hasRate,spaceY,powerN,
+      oneTimeCost:cost,savingMonth,savingYear,payback:paybackA,rec,next,owner,due,
+      riders,tar, best,
+      prodSavingMonth, prodPayback, prodExtraOrdersDay};
   });
   return rows;
 }
