@@ -505,6 +505,13 @@ function normDate(v){
   if(!s || s==="0") return null;
   return s;
 }
+// Display format: "dd mm yyyy" (e.g. 20 Sep 2026). Handles ISO strings, Excel serials ("46285"), and Dates.
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtD(v){
+  const d=parseAnyDate(v);
+  if(d==null) return "—";
+  return String(d.getDate()).padStart(2,'0')+' '+MONTHS[d.getMonth()]+' '+d.getFullYear();
+}
 function within30(iso,today){
   if(!iso) return false;
   const d=parseAnyDate(iso);
@@ -852,7 +859,7 @@ function refreshVersionDropdown(selected){
     const o=document.createElement("option"); o.value=ver.id; o.textContent="🕘 "+ver.label; sel.appendChild(o);
   });
   // transient "live" entry (uploaded-but-unsaved) — shown only while an upload is pending save
-  if(window.__LIVE && window.__LIVE.unsaved){ const o=document.createElement("option"); o.value="live"; o.textContent="Live (unsaved upload) — "+window.__LIVE.as_of; sel.appendChild(o); }
+  if(window.__LIVE && window.__LIVE.unsaved){ const o=document.createElement("option"); o.value="live"; o.textContent="Live (unsaved upload) — "+fmtD(window.__LIVE.as_of); sel.appendChild(o); }
   sel.value = selected || cur || "current";
 }
 function markDirty(yes){
@@ -875,7 +882,7 @@ document.getElementById("saveBtn").addEventListener("click",function(){
   const name=prompt("Name this snapshot (e.g. "+todayISO()+" review):", "Snapshot "+todayISO());
   if(!name) return;
   const id="v_"+Date.now();
-  const ver={id, label:name+" — "+blob.as_of, as_of:blob.as_of, batch:blob.batch, raw:blob.raw, rateCard:blob.rateCard};
+  const ver={id, label:name+" — "+fmtD(blob.as_of), as_of:blob.as_of, batch:blob.batch, raw:blob.raw, rateCard:blob.rateCard};
   const all=loadVersions(); all.push(ver); saveVersions(all);
   if(window.__LIVE){ window.__LIVE.unsaved=false; }   // upload is now persisted as a snapshot
   applyVersion(ver, true);
@@ -1192,7 +1199,7 @@ function openModal(title,key){
     const f=pods.filter(p=>fc==="all"||p.city===fc);
     const b=(v)=>v==="Y"?'<span class="badge-y">Y</span>':v==="N"?'<span class="badge-n">N</span>':v==="wip"?'<span class="badge-w">WIP</span>':'<span style="color:var(--muted2)">—</span>';
     const nocDisp=(p)=>{ if(p.store_status==="upcoming_live") return '<span class="badge-y">Yes</span>'; const v=p.noc_status; return v==="Yes"?'<span class="badge-y">Yes</span>':v==="No"?'<span class="badge-n">No</span>':v==="WIP"?'<span class="badge-w">WIP</span>':'<span style="color:var(--muted2)">—</span>'; };
-    const rows=f.map(p=>`<tr><td><b>${p.pod_id||"—"}</b></td><td>${p.pod_name||"—"}</td><td>${p.city||"—"}</td><td>${p.store_status==="upcoming_live"?"<span style=color:#2563eb>upcoming</span>":"live"}</td><td>${b(p.space_available)}</td><td>${b(p.power_available)}</td><td>${nocDisp(p)}</td><td>${p.target_go_live||"—"}</td><td style="font-size:11px">${(p.notes||"").slice(0,40)}</td></tr>`).join("");
+    const rows=f.map(p=>`<tr><td><b>${p.pod_id||"—"}</b></td><td>${p.pod_name||"—"}</td><td>${p.city||"—"}</td><td>${p.store_status==="upcoming_live"?"<span style=color:#2563eb>upcoming</span>":"live"}</td><td>${b(p.space_available)}</td><td>${b(p.power_available)}</td><td>${nocDisp(p)}</td><td style="white-space:nowrap">${fmtD(p.target_go_live)}</td><td style="font-size:11px">${(p.notes||"").slice(0,40)}</td></tr>`).join("");
     return `<div class="cnt">${f.length} pod(s)${f.length!==pods.length?" (of "+pods.length+" after filter)":""}</div>
       <table><thead><tr><th>Pod ID</th><th>Name</th><th>City</th><th>Store</th><th>Space</th><th>Power</th><th>NOC</th><th>Target go-live</th><th>Notes</th></tr></thead><tbody>${rows||'<tr><td colspan=9 style=text-align:center;color:var(--muted)>No pods match the filter</td></tr>'}</tbody></table>`;
   };
@@ -1496,16 +1503,16 @@ function renderT1(){
       <div class="vg-col-detail"><div class="vg-vendor" style="border-left:3px solid var(--green)"><span class="vg-vname">Live stations</span><span class="vg-count" style="background:var(--green)">${alreadyLive}</span></div></div>
       <div class="vg-col-total"><span class="vg-cumul" style="color:var(--green)">${alreadyLive}</span></div>
     </div>
-    ${alreadyLive?`<div class="vg-expand" id="vgx-alreadylive" style="display:none"><table class="vg-detail-table"><thead><tr><th>Pod</th><th>City</th><th>Vendor</th><th>Go-live date</th></tr></thead><tbody>${alreadyLivePods.map(p=>`<tr><td><b>${p.pod_name||p.pod_id}</b></td><td>${p.city||'—'}</td><td>${p.vendor}</td><td>${p.date.toISOString().slice(0,10)}</td></tr>`).join('')}</tbody></table></div>`:''}
+    ${alreadyLive?`<div class="vg-expand" id="vgx-alreadylive" style="display:none"><table class="vg-detail-table"><thead><tr><th>Pod</th><th>City</th><th>Vendor</th><th>Go-live date</th></tr></thead><tbody>${alreadyLivePods.map(p=>`<tr><td><b>${p.pod_name||p.pod_id}</b></td><td>${p.city||'—'}</td><td>${p.vendor}</td><td style="white-space:nowrap">${fmtD(p.date)}</td></tr>`).join('')}</tbody></table></div>`:''}
     ${rows.map(r=>`
       <div class="vg-row ${r.total?'':'vg-row-empty'} vg-clickable" data-mk="${r.k}" onclick="vgToggle('${r.k}')">
         <div class="vg-col-month"><div class="vg-mlabel">${mLabel(r.m)}</div>${r.total?'<div class="vg-expand-hint">▾ click to expand</div>':''}</div>
         <div class="vg-col-detail">${vChips(r.vendors)}</div>
         <div class="vg-col-total"><span class="vg-cumul">${r.cumul}</span>${r.total?'<div class="vg-mo-count">+${r.total} this mo</div>':''}</div>
       </div>
-      ${r.total?`<div class="vg-expand" id="vgx-${r.k}" style="display:none"><table class="vg-detail-table"><thead><tr><th>Pod</th><th>City</th><th>Vendor</th><th>Go-live date</th></tr></thead><tbody>${dated.filter(p=>mKey(p.date)===r.k).map(p=>`<tr><td><b>${p.pod_name||p.pod_id}</b></td><td>${p.city||'—'}</td><td>${p.vendor}</td><td>${p.date.toISOString().slice(0,10)}</td></tr>`).join('')}</tbody></table></div>`:''}`).join('')}
+      ${r.total?`<div class="vg-expand" id="vgx-${r.k}" style="display:none"><table class="vg-detail-table"><thead><tr><th>Pod</th><th>City</th><th>Vendor</th><th>Go-live date</th></tr></thead><tbody>${dated.filter(p=>mKey(p.date)===r.k).map(p=>`<tr><td><b>${p.pod_name||p.pod_id}</b></td><td>${p.city||'—'}</td><td>${p.vendor}</td><td style="white-space:nowrap">${fmtD(p.date)}</td></tr>`).join('')}</tbody></table></div>`:''}`).join('')}
   </div>
-  <div class="small muted" style="margin-top:10px">${alreadyLive} already live + ${dated.length} with go-live dates (${mLabel(months[0])} → ${mLabel(months[months.length-1])}). Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${DATA.as_of}.</div>
+  <div class="small muted" style="margin-top:10px">${alreadyLive} already live + ${dated.length} with go-live dates (${mLabel(months[0])} → ${mLabel(months[months.length-1])}). Vendors: ${vendors.map(v=>`${v} (${vendorTotals[v]})`).join(' · ')}. Data as of ${fmtD(DATA.as_of)}.</div>
   </div>`;
 }
 
@@ -1553,7 +1560,7 @@ function renderT2(){
     <tbody>${ROI.map(r=>`<tr><td><b>${r.pod_id}</b></td><td>${r.city}</td><td>${r.present!=null?r.present+' kWh':'—'}</td><td>${r.addl!=null?r.addl+' kWh':'—'}</td><td>${r.oneTimeCost!=null?inr(r.oneTimeCost):(r.hasRate===false?'manual':r.rec==='pending'?'—':'manual')}</td><td>${r.savingMonth!=null?inr(r.savingMonth):'—'}</td><td>${r.savingYear!=null?inr(r.savingYear):'—'}</td><td>${r.payback!=null?r.payback+' mo':'—'}</td><td><span class="rec ${r.rec}">${r.rec}</span></td><td>${r.next}</td><td>${r.owner}</td><td>${r.due}</td></tr>`).join('')}</tbody></table></div>
   </div>
   <div class="small muted" style="max-width:1400px;margin:0 auto;padding:0 4px 16px;line-height:1.5">
-    <b>Methodology.</b> Inputs: Assessment sheet (${RAW.assessed.length} pods), ROI sheet (${RAW.roi.length} pods with rider &amp; load data), rate card (${Object.keys(RATE_CARD).length} cities: ${Object.keys(RATE_CARD).join(', ')}). One-time cost = rate card × <code>additional_load_required</code>. Monthly saving = <code>orders_per_rider_month</code> × <code>per_order_ev_saving</code> × (<code>riders_at_pod</code> × <code>rider_ev_share_target_pct</code> ÷ 100); figures are steady-state at target EV share. Payback = one-time cost ÷ monthly saving. Hurdle: 12 months. Pods with total load &gt;100 kWh, or in cities absent from the rate card, are flagged for a manual quote rather than auto-recommended. Data as of ${DATA.as_of}.
+    <b>Methodology.</b> Inputs: Assessment sheet (${RAW.assessed.length} pods), ROI sheet (${RAW.roi.length} pods with rider &amp; load data), rate card (${Object.keys(RATE_CARD).length} cities: ${Object.keys(RATE_CARD).join(', ')}). One-time cost = rate card × <code>additional_load_required</code>. Monthly saving = <code>orders_per_rider_month</code> × <code>per_order_ev_saving</code> × (<code>riders_at_pod</code> × <code>rider_ev_share_target_pct</code> ÷ 100); figures are steady-state at target EV share. Payback = one-time cost ÷ monthly saving. Hurdle: 12 months. Pods with total load &gt;100 kWh, or in cities absent from the rate card, are flagged for a manual quote rather than auto-recommended. Data as of ${fmtD(DATA.as_of)}.
   </div>`;
 }
 /* ROI summary header — total ask, total monthly/annual saving, blended payback, counts */
